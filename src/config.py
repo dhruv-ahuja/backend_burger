@@ -1,5 +1,8 @@
+from mypy_boto3_sqs import SQSServiceResource
+from mypy_boto3_sqs.service_resource import Queue
 from pydantic import MongoDsn, SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+import boto3
 
 
 class Settings(BaseSettings):
@@ -25,3 +28,24 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
         settings = Settings()  # type: ignore
 
     return settings
+
+
+def connect_to_sqs(
+    key_id: str, key_secret: str, region_name: str, queue_name: str
+) -> SQSServiceResource:
+    """Establishes a connection to the SQS service and returns its resource object."""
+
+    sqs = boto3.resource(
+        "sqs",
+        aws_access_key_id=key_id,
+        aws_secret_access_key=key_secret,
+        region_name=region_name,
+    )
+    return sqs
+
+
+def get_sqs_queue(sqs: SQSServiceResource, queue_name: str) -> Queue:
+    """Fetches and returns a queue from the SQS resouce."""
+
+    queue = sqs.get_queue_by_name(QueueName=queue_name)
+    return queue
