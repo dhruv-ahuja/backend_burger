@@ -72,3 +72,21 @@ async def connect_to_mongodb(db_url: str, document_models: list | None = None) -
     )
 
     print("successfully connected")
+
+
+settings = generate_settings_config()
+
+sqs = connect_to_sqs(
+    settings.aws_access_key.get_secret_value(),
+    settings.aws_access_secret.get_secret_value(),
+    settings.aws_region_name,
+)
+queue = get_sqs_queue(sqs, settings.sqs_queue_name)
+
+
+@asynccontextmanager
+async def setup_services(_: FastAPI) -> AsyncGenerator[None, Any]:
+    """Sets up connections to required services on app startup."""
+
+    await connect_to_mongodb(settings.db_url.get_secret_value())
+    yield
