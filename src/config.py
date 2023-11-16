@@ -36,9 +36,7 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
     return settings
 
 
-def connect_to_sqs(
-    key_id: str, key_secret: str, region_name: str
-) -> SQSServiceResource:
+def connect_to_sqs(key_id: str, key_secret: str, region_name: str) -> SQSServiceResource:
     """Establishes a connection to the SQS service and returns its resource object."""
 
     sqs = boto3.resource(
@@ -57,19 +55,14 @@ def get_sqs_queue(sqs: SQSServiceResource, queue_name: str) -> Queue:
     return queue
 
 
-async def connect_to_mongodb(db_url: str, document_models: list | None = None) -> None:
+async def connect_to_mongodb(db_url: str, document_models: list) -> None:
     """Connects to the MongoDB database given its URL and list of Beanie `Document` modelss to create, after
     establishing connection."""
 
     print("connecting to Mongo database")
 
-    if document_models is None:
-        document_models = []
-
     client = AsyncIOMotorClient(db_url)
-    await beanie.init_beanie(
-        database=client.backendBurger, document_models=document_models
-    )
+    await beanie.init_beanie(database=client.backendBurger, document_models=document_models)
 
     print("successfully connected")
 
@@ -88,5 +81,5 @@ queue = get_sqs_queue(sqs, settings.sqs_queue_name)
 async def setup_services(_: FastAPI) -> AsyncGenerator[None, Any]:
     """Sets up connections to required services on app startup."""
 
-    await connect_to_mongodb(settings.db_url.get_secret_value())
+    await connect_to_mongodb(settings.db_url.get_secret_value(), [])
     yield
