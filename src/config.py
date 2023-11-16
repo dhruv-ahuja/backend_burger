@@ -1,8 +1,14 @@
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
+
+from fastapi import FastAPI
+import boto3
 from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
-from pydantic import MongoDsn, SecretStr, Field
+from pydantic import SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import boto3
+import beanie
+from motor.motor_asyncio import AsyncIOMotorClient
 
 
 class Settings(BaseSettings):
@@ -15,7 +21,7 @@ class Settings(BaseSettings):
     aws_region_name: str
     sqs_queue_name: str
 
-    db_url: MongoDsn
+    db_url: SecretStr
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -31,7 +37,7 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
 
 
 def connect_to_sqs(
-    key_id: str, key_secret: str, region_name: str, queue_name: str
+    key_id: str, key_secret: str, region_name: str
 ) -> SQSServiceResource:
     """Establishes a connection to the SQS service and returns its resource object."""
 
@@ -49,3 +55,20 @@ def get_sqs_queue(sqs: SQSServiceResource, queue_name: str) -> Queue:
 
     queue = sqs.get_queue_by_name(QueueName=queue_name)
     return queue
+
+
+async def connect_to_mongodb(db_url: str, document_models: list | None = None) -> None:
+    """Connects to the MongoDB database given its URL and list of Beanie `Document` modelss to create, after
+    establishing connection."""
+
+    print("connecting to Mongo database")
+
+    if document_models is None:
+        document_models = []
+
+    client = AsyncIOMotorClient(db_url)
+    await beanie.init_beanie(
+        database=client.backendBurger, document_models=document_models
+    )
+
+    print("successfully connected")
