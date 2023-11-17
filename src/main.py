@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from .config import setup_services
+from .config.services import setup_services
 
 
 app = FastAPI(lifespan=setup_services)
