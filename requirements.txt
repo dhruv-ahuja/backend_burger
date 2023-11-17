@@ -21,6 +21,7 @@ idna==3.4
 jmespath==1.0.1
 kombu==5.3.3
 lazy-model==0.2.0
+loguru==0.7.2
 motor==3.3.1
 mypy-boto3-cloudformation==1.28.83
 mypy-boto3-dynamodb==1.28.73
