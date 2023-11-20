@@ -8,6 +8,7 @@ from fastapi import FastAPI
 import boto3
 from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
+from mypy_boto3_logs.client import CloudWatchLogsClient
 from pydantic import SecretStr, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import beanie
@@ -15,6 +16,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from loguru import logger
 import boto3.exceptions
 import botocore.errorfactory
+from watchtower import CloudWatchLogHandler
 
 from .consts import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT
 
@@ -53,6 +55,36 @@ def initialize_logger(
 
     logger.remove(0)
     logger.add(**configuration)
+
+
+def connect_to_cloudwatch(key_id: str, key_secret: str, region_name: str) -> CloudWatchLogsClient:
+    """Establishes a connection to the CloudWatch service and returns its resource object."""
+
+    try:
+        client = boto3.client(
+            "logs",
+            aws_access_key_id=key_id,
+            aws_secret_access_key=key_secret,
+            region_name=region_name,
+        )
+    except boto3.exceptions.Boto3Error as ex:
+        logger.error(f"error accessing Logs resource: {ex}")
+        raise
+
+    return client
+
+
+def initialize_cloudwatch_handler(
+    client: CloudWatchLogsClient, log_group: str, log_stream: str | None = None, retention_period: int = 30
+):
+    """Initializes and registers the CloudWatch Logs handler with the application logger."""
+
+    configuration = {"log_group_name": log_group, "log_group_retention_days": retention_period, "boto3_client": client}
+    if log_stream is not None:
+        configuration["log_stream_name"] = log_stream
+
+    handler = CloudWatchLogHandler(**configuration)
+    logger.add(handler)
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -120,6 +152,13 @@ sqs = connect_to_sqs(
     settings.aws_region_name,
 )
 queue = get_sqs_queue(sqs, settings.sqs_queue_name)
+
+cloudwatch_client = connect_to_cloudwatch(
+    settings.aws_access_key.get_secret_value(),
+    settings.aws_access_secret.get_secret_value(),
+    settings.aws_region_name,
+)
+initialize_cloudwatch_handler(cloudwatch_client, "backendBurger")
 
 
 @asynccontextmanager
