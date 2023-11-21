@@ -62,15 +62,15 @@ def get_aws_service(service: AwsService, session: boto3.Session) -> SQSServiceRe
         match service.value:
             case "sqs":
                 client = session.resource(service.value)
-                return cast(SQSServiceResource, client)
             case "logs":
                 client = session.client(service.value)
-                return cast(CloudWatchLogsClient, client)
             case _:
                 raise ValueError("Enter a valid aws service.")
     except boto3.exceptions.Boto3Error as ex:
         logger.error(f"error accessing {service} AWS service: {ex}")
         raise
+
+    return client
 
 
 def initialize_logger(
@@ -105,8 +105,7 @@ def initialize_cloudwatch_handler(
     """Initializes and registers the CloudWatch Logs handler with the application logger."""
 
     # * workaround to narrow the union type
-    if not isinstance(client, CloudWatchLogsClient):
-        raise ValueError(f"expected client of type {CloudWatchLogsClient}")
+    client = cast(CloudWatchLogsClient, client)
 
     configuration = {"log_group_name": log_group, "log_group_retention_days": retention_period, "boto3_client": client}
     if log_stream is not None:
