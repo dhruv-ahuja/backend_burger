@@ -1,8 +1,10 @@
 from fastapi import FastAPI
 
 from .config.services import setup_services
+from .config.middleware import LoggingMiddleware
 
 app = FastAPI(lifespan=setup_services)
+app.add_middleware(LoggingMiddleware)
 
 
 @app.get("/")
