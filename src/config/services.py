@@ -128,12 +128,11 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
     return settings
 
 
-def get_sqs_queue(queue_name: str, client: SQSServiceResource | CloudWatchLogsClient) -> Queue:
+def get_sqs_queue(client: SQSServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
-    if not isinstance(client, SQSServiceResource):
-        raise ValueError(f"expected client of type {SQSServiceResource}")
+    client = cast(SQSServiceResource, client)
 
     try:
         queue = client.get_queue_by_name(QueueName=queue_name)
@@ -172,7 +171,7 @@ cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
 initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
 
 sqs_client = get_aws_service(AwsService.SQS, aws_session)
-queue = get_sqs_queue(PROJECT_NAME, sqs_client)
+queue = get_sqs_queue(sqs_client, PROJECT_NAME)
 
 
 @asynccontextmanager
