@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
+from enum import Enum
 import pathlib
 import sys
-from typing import Any, AsyncGenerator, TextIO
-import botocore
+from typing import Any, AsyncGenerator, TextIO, cast
 
 from fastapi import FastAPI
 import boto3
+import botocore
 from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
 from mypy_boto3_logs.client import CloudWatchLogsClient
@@ -21,6 +22,14 @@ from watchtower import CloudWatchLogHandler
 from .consts import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT, PROJECT_NAME
 
 
+class AwsService(str, Enum):
+    CloudwatchLogs = "logs"
+    SQS = "sqs"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class Settings(BaseSettings):
     """Parses the configuration settings for the application from the environment."""
 
@@ -32,6 +41,36 @@ class Settings(BaseSettings):
     sqs_queue_name: str
 
     db_url: SecretStr
+
+
+def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
+    """Creates and returns a Session object for connecting to AWS services."""
+
+    try:
+        session = boto3.Session(aws_access_key_id=key_id, aws_secret_access_key=key_secret, region_name=region_name)
+    except boto3.exceptions.Boto3Error as ex:
+        logger.error(f"error connecting to AWS: {ex}")
+        raise
+
+    return session
+
+
+def get_aws_service(service: AwsService, session: boto3.Session) -> SQSServiceResource | CloudWatchLogsClient:
+    """Gets and returns the AWS resource object's instance."""
+
+    try:
+        match service.value:
+            case "sqs":
+                client = session.resource(service.value)
+                return cast(SQSServiceResource, client)
+            case "logs":
+                client = session.client(service.value)
+                return cast(CloudWatchLogsClient, client)
+            case _:
+                raise ValueError("Enter a valid aws service.")
+    except boto3.exceptions.Boto3Error as ex:
+        logger.error(f"error accessing {service} AWS service: {ex}")
+        raise
 
 
 def initialize_logger(
@@ -57,27 +96,17 @@ def initialize_logger(
     logger.add(**configuration)
 
 
-def connect_to_cloudwatch(key_id: str, key_secret: str, region_name: str) -> CloudWatchLogsClient:
-    """Establishes a connection to the CloudWatch service and returns its resource object."""
-
-    try:
-        client = boto3.client(
-            "logs",
-            aws_access_key_id=key_id,
-            aws_secret_access_key=key_secret,
-            region_name=region_name,
-        )
-    except boto3.exceptions.Boto3Error as ex:
-        logger.error(f"error accessing Logs resource: {ex}")
-        raise
-
-    return client
-
-
 def initialize_cloudwatch_handler(
-    client: CloudWatchLogsClient, log_group: str, log_stream: str | None = None, retention_period: int = 30
+    client: SQSServiceResource | CloudWatchLogsClient,
+    log_group: str,
+    log_stream: str | None = None,
+    retention_period: int = 30,
 ):
     """Initializes and registers the CloudWatch Logs handler with the application logger."""
+
+    # * workaround to narrow the union type
+    if not isinstance(client, CloudWatchLogsClient):
+        raise ValueError(f"expected client of type {CloudWatchLogsClient}")
 
     configuration = {"log_group_name": log_group, "log_group_retention_days": retention_period, "boto3_client": client}
     if log_stream is not None:
@@ -99,28 +128,15 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
     return settings
 
 
-def connect_to_sqs(key_id: str, key_secret: str, region_name: str) -> SQSServiceResource:
-    """Establishes a connection to the SQS service and returns its resource object."""
-
-    try:
-        sqs = boto3.resource(
-            "sqs",
-            aws_access_key_id=key_id,
-            aws_secret_access_key=key_secret,
-            region_name=region_name,
-        )
-    except boto3.exceptions.Boto3Error as ex:
-        logger.error(f"error accessing SQS resource: {ex}")
-        raise
-
-    return sqs
-
-
-def get_sqs_queue(sqs: SQSServiceResource, queue_name: str) -> Queue:
+def get_sqs_queue(queue_name: str, client: SQSServiceResource | CloudWatchLogsClient) -> Queue:
     """Fetches and returns an existing queue from the SQS resouce."""
 
+    # * workaround to narrow the union type
+    if not isinstance(client, SQSServiceResource):
+        raise ValueError(f"expected client of type {SQSServiceResource}")
+
     try:
-        queue = sqs.get_queue_by_name(QueueName=queue_name)
+        queue = client.get_queue_by_name(QueueName=queue_name)
     except botocore.errorfactory.ClientError as ex:
         logger.error(f"error getting SQS queue: {ex}")
         raise
@@ -146,19 +162,17 @@ async def connect_to_mongodb(db_url: str, document_models: list) -> None:
 
 settings = generate_settings_config()
 
-sqs = connect_to_sqs(
+aws_session = initialize_aws_session(
     settings.aws_access_key.get_secret_value(),
     settings.aws_access_secret.get_secret_value(),
     settings.aws_region_name,
 )
-queue = get_sqs_queue(sqs, settings.sqs_queue_name)
 
-cloudwatch_client = connect_to_cloudwatch(
-    settings.aws_access_key.get_secret_value(),
-    settings.aws_access_secret.get_secret_value(),
-    settings.aws_region_name,
-)
+cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
 initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
+
+sqs_client = get_aws_service(AwsService.SQS, aws_session)
+queue = get_sqs_queue(PROJECT_NAME, sqs_client)
 
 
 @asynccontextmanager
