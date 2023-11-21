@@ -18,7 +18,7 @@ import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
 
-from .consts import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT
+from .consts import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT, PROJECT_NAME
 
 
 class Settings(BaseSettings):
@@ -158,7 +158,7 @@ cloudwatch_client = connect_to_cloudwatch(
     settings.aws_access_secret.get_secret_value(),
     settings.aws_region_name,
 )
-initialize_cloudwatch_handler(cloudwatch_client, "backendBurger")
+initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
 
 
 @asynccontextmanager
