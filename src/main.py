@@ -1,4 +1,3 @@
-from typing import Any
 from fastapi import FastAPI
 
 from .config.services import setup_services
@@ -10,7 +9,7 @@ app.add_middleware(LoggingMiddleware)
 
 
 @app.get("/")
-async def get() -> AppResponse[dict[str, Any], None]:
+async def get():
     """Returns a simple success message indicating that the server is up and running."""
 
     response = BaseResponse(data={"status": "ok"})
