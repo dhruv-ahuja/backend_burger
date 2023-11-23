@@ -1,4 +1,4 @@
-from typing import Any, Type
+from typing import Any, Type, TypeVar, Generic, TypeAlias
 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -14,18 +14,23 @@ class BaseError(BaseModel):
     fields: dict[str, list[str]] | None = None
 
 
-class BaseResponse(BaseModel):
+# * defining types here to avoid 'missing declarations' errors
+T = TypeVar("T", Type[BaseModel], dict[str, Any], None)
+E = TypeVar("E", BaseError, None)
+
+
+class BaseResponse(BaseModel, Generic[T, E]):
     """Defines the base response structure for the application."""
 
-    data: Type[BaseModel] | dict[str, Any] | None
-    error: BaseError | None = None
+    data: T
+    error: E | None = None
 
 
-class AppResponse(JSONResponse):
+class AppResponse(JSONResponse, Generic[T, E]):
     """Application's core response type, enforces a set structure for the APIs' responses."""
 
     def __init__(
-        self, content: BaseResponse, status_code: int = HTTP_200_OK, headers: dict[str, str] | None = None
+        self, content: BaseResponse[T, E], status_code: int = HTTP_200_OK, headers: dict[str, str] | None = None
     ) -> None:
         # serialize response object into dict
         data = content.model_dump()
@@ -34,3 +39,6 @@ class AppResponse(JSONResponse):
 
     def render(self, content: Any) -> bytes:
         return orjson.dumps(content)
+
+
+ErrorResponse: TypeAlias = AppResponse[None, BaseError]
