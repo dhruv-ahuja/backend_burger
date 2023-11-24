@@ -6,6 +6,26 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.types import ASGIApp
 from loguru import logger
 
+from src.schemas.exceptions import ERROR_RESPONSE
+from src.schemas.responses import ErrorResponse
+
+
+class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
+    """Catches errors occuring during the request lifetime and returns a generic 500 error response."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        super().__init__(app)
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> ErrorResponse | Response:
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.error(f"error when processing request: {exc}")
+            print(f"error when processing request: {exc}")
+            return ERROR_RESPONSE
+
+        return response
+
 
 class LoggingMiddleware(BaseHTTPMiddleware):
     """Logs information relating to the current request and adds context to the request, making it uniqely identifiable."""
