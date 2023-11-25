@@ -11,7 +11,7 @@ class BaseError(BaseModel):
 
     type: str
     message: str
-    fields: dict[str, list[str]] | None = None
+    fields: list[dict[str, Any]] | None = None
 
 
 # * defining types here to avoid 'missing declarations' errors
