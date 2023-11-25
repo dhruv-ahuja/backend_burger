@@ -19,7 +19,8 @@ import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
 
-from .consts import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT, PROJECT_NAME
+from .constants.app import PROJECT_NAME
+from .constants.logger import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT
 
 
 class AwsService(str, Enum):

@@ -3,8 +3,9 @@ from fastapi.exceptions import ValidationException
 from loguru import logger
 from pydantic import ValidationError
 from starlette import status
-from src.config.consts import ERROR_MAPPING
 
+from src.config.constants.app import INTERNAL_SCHEMA_MODELS
+from src.config.constants.exceptions import ERROR_MAPPING
 from src.config.utils import parse_validation_error
 from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorResponse
 
@@ -22,7 +23,7 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
 
     path = request.url.path
     if isinstance(exc, ValidationError):
-        if exc.title in ["BaseResponse", "ErrorResponse", "BaseError"]:
+        if exc.title in INTERNAL_SCHEMA_MODELS:
             errors = exc.errors(include_url=False)
             logger.error(f"error using internal pydantic model {exc.title} at {path}: {errors}")
 

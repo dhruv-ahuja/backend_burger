@@ -3,9 +3,6 @@ from fastapi.exceptions import ValidationException
 from pydantic import ValidationError
 
 
-password_regex = r"^(?=.*[a-zA-Z])(?=.*\d)(?=.*[!@#$%^&*()_+])[A-Za-z\d][A-Za-z\d!@#$%^&*()_+]{7,255}$"
-
-
 def parse_validation_error(exc: ValidationError | ValidationException) -> list[dict[str, Any]]:
     # """Parses and extracts required information from FastAPI endpoints' and Pydantic models' `ValidationError`s."""
     """Parses and extracts required information from FastAPI endpoints' `ValidationException`s."""
