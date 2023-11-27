@@ -7,6 +7,8 @@ from typing import Any, AsyncGenerator, TextIO, cast
 from fastapi import FastAPI
 import boto3
 import botocore
+from mypy_boto3_s3 import S3ServiceResource
+from mypy_boto3_s3.service_resource import Bucket
 from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
 from mypy_boto3_logs.client import CloudWatchLogsClient
@@ -19,13 +21,14 @@ import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
 
-from .constants.app import PROJECT_NAME
+from .constants.app import PROJECT_NAME, S3_BUCKET_NAME
 from .constants.logger import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT
 
 
 class AwsService(str, Enum):
     CloudwatchLogs = "logs"
     SQS = "sqs"
+    S3 = "s3"
 
     def __str__(self) -> str:
         return self.value
@@ -34,7 +37,7 @@ class AwsService(str, Enum):
 class Settings(BaseSettings):
     """Parses the configuration settings for the application from the environment."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="allow")
 
     aws_access_key: SecretStr = Field(alias="AWS_ACCESS_KEY_ID")
     aws_access_secret: SecretStr = Field(alias="AWS_SECRET_ACCESS_KEY")
@@ -42,6 +45,18 @@ class Settings(BaseSettings):
     sqs_queue_name: str
 
     db_url: SecretStr
+
+
+def generate_settings_config(env_location: str | None = None) -> Settings:
+    """Calls the Settings class' instance, which parses and prepares env vars for use throughout the application.\n
+    `env_location` overwrites the default env file location to read from."""
+
+    if env_location is not None:
+        settings = Settings(_env_file=env_location)  # type: ignore
+    else:
+        settings = Settings()  # type: ignore
+
+    return settings
 
 
 def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
@@ -56,12 +71,15 @@ def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> bo
     return session
 
 
-def get_aws_service(service: AwsService, session: boto3.Session) -> SQSServiceResource | CloudWatchLogsClient:
+# TODO: refactor and simplify the return types
+def get_aws_service(
+    service: AwsService, session: boto3.Session
+) -> SQSServiceResource | S3ServiceResource | CloudWatchLogsClient:
     """Gets and returns the AWS resource object's instance."""
 
     try:
         match service.value:
-            case "sqs":
+            case "sqs" | "s3":
                 client = session.resource(service.value)
             case "logs":
                 client = session.client(service.value)
@@ -98,7 +116,7 @@ def initialize_logger(
 
 
 def initialize_cloudwatch_handler(
-    client: SQSServiceResource | CloudWatchLogsClient,
+    client: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient,
     log_group: str,
     log_stream: str | None = None,
     retention_period: int = 30,
@@ -116,19 +134,7 @@ def initialize_cloudwatch_handler(
     logger.add(handler)
 
 
-def generate_settings_config(env_location: str | None = None) -> Settings:
-    """Calls the Settings class' instance, which parses and prepares env vars for use throughout the application.\n
-    `env_location` overwrites the default env file location to read from."""
-
-    if env_location is not None:
-        settings = Settings(_env_file=env_location)  # type: ignore
-    else:
-        settings = Settings()  # type: ignore
-
-    return settings
-
-
-def get_sqs_queue(client: SQSServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
+def get_sqs_queue(client: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
@@ -141,6 +147,22 @@ def get_sqs_queue(client: SQSServiceResource | CloudWatchLogsClient, queue_name:
         raise
 
     return queue
+
+
+def get_s3_bucket(s3: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient, bucket_name: str) -> Bucket:
+    """Fetches and returns an existing queue from the SQS resouce."""
+
+    # * workaround to narrow the union type
+    s3 = cast(S3ServiceResource, s3)
+
+    try:
+        bucket = s3.Bucket(bucket_name)
+    except botocore.errorfactory.ClientError as ex:
+        logger.error(f"error getting S3 bucket: {ex}")
+        print(f"error getting S3 bucket: {ex}")
+        raise
+
+    return bucket
 
 
 async def connect_to_mongodb(db_url: str, document_models: list) -> None:
@@ -167,11 +189,15 @@ aws_session = initialize_aws_session(
     settings.aws_region_name,
 )
 
+# TODO: initialize these on fastapi startup
 cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
 initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
 
 sqs_client = get_aws_service(AwsService.SQS, aws_session)
 queue = get_sqs_queue(sqs_client, PROJECT_NAME)
+
+s3 = get_aws_service(AwsService.S3, aws_session)
+bucket = get_s3_bucket(s3, S3_BUCKET_NAME)
 
 
 @asynccontextmanager
