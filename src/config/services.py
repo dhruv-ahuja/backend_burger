@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from enum import Enum
 import pathlib
 import sys
-from typing import Any, AsyncGenerator, TextIO, cast
+import typing as t
 
 from fastapi import FastAPI
 import boto3
@@ -22,8 +22,8 @@ import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
 
-from .constants.app import PROJECT_NAME, S3_BUCKET_NAME
-from .constants.logger import LOG_DIRECTORY, LOGGER_FILENAME_FORMAT, LOGGER_MESSAGE_FORMAT
+from constants import app
+from constants import logger as log
 
 
 class AwsService(str, Enum):
@@ -91,7 +91,7 @@ def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResou
 
 
 def initialize_logger(
-    format: str, path: pathlib.Path | None = None, filename: str | TextIO = sys.stderr, rotation: str | int = "00:00"
+    format: str, path: pathlib.Path | None = None, filename: str | t.TextIO = sys.stderr, rotation: str | int = "00:00"
 ) -> None:
     """Initializes the logger with the given configuration parameters.\n
     Uses `rotation` and `path` only when supplying a log file name."""
@@ -122,7 +122,7 @@ def initialize_cloudwatch_handler(
     """Initializes and registers the CloudWatch Logs handler with the application logger."""
 
     # * workaround to narrow the union type
-    client = cast(CloudWatchLogsClient, client)
+    client = t.cast(CloudWatchLogsClient, client)
 
     configuration = {"log_group_name": log_group, "log_group_retention_days": retention_period, "boto3_client": client}
     if log_stream is not None:
@@ -136,7 +136,7 @@ def get_sqs_queue(client: ServiceResource | CloudWatchLogsClient, queue_name: st
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
-    client = cast(SQSServiceResource, client)
+    client = t.cast(SQSServiceResource, client)
 
     try:
         queue = client.get_queue_by_name(QueueName=queue_name)
@@ -151,7 +151,7 @@ def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) 
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
-    s3 = cast(S3ServiceResource, s3)
+    s3 = t.cast(S3ServiceResource, s3)
 
     try:
         bucket = s3.Bucket(bucket_name)
@@ -189,22 +189,22 @@ aws_session = initialize_aws_session(
 
 # TODO: initialize these on fastapi startup
 cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
-initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
+initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
 
 sqs_client = get_aws_service(AwsService.SQS, aws_session)
-queue = get_sqs_queue(sqs_client, PROJECT_NAME)
+queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
 print(queue)
 
 s3 = get_aws_service(AwsService.S3, aws_session)
-bucket = get_s3_bucket(s3, S3_BUCKET_NAME)
+bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
 
 
 @asynccontextmanager
-async def setup_services(_: FastAPI) -> AsyncGenerator[None, Any]:
+async def setup_services(_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to required services on app startup."""
 
-    path = pathlib.Path(LOG_DIRECTORY)
-    initialize_logger(LOGGER_MESSAGE_FORMAT, path, LOGGER_FILENAME_FORMAT)
+    path = pathlib.Path(log.LOG_DIRECTORY)
+    initialize_logger(log.LOGGER_MESSAGE_FORMAT, path, log.LOGGER_FILENAME_FORMAT)
 
     await connect_to_mongodb(settings.db_url.get_secret_value(), [])
 
