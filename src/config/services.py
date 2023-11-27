@@ -7,6 +7,7 @@ from typing import Any, AsyncGenerator, TextIO, cast
 from fastapi import FastAPI
 import boto3
 import botocore
+from boto3.resources.base import ServiceResource
 from mypy_boto3_s3 import S3ServiceResource
 from mypy_boto3_s3.service_resource import Bucket
 from mypy_boto3_sqs import SQSServiceResource
@@ -71,10 +72,7 @@ def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> bo
     return session
 
 
-# TODO: refactor and simplify the return types
-def get_aws_service(
-    service: AwsService, session: boto3.Session
-) -> SQSServiceResource | S3ServiceResource | CloudWatchLogsClient:
+def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResource | CloudWatchLogsClient:
     """Gets and returns the AWS resource object's instance."""
 
     try:
@@ -116,7 +114,7 @@ def initialize_logger(
 
 
 def initialize_cloudwatch_handler(
-    client: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient,
+    client: ServiceResource | CloudWatchLogsClient,
     log_group: str,
     log_stream: str | None = None,
     retention_period: int = 30,
@@ -134,7 +132,7 @@ def initialize_cloudwatch_handler(
     logger.add(handler)
 
 
-def get_sqs_queue(client: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
+def get_sqs_queue(client: ServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
@@ -149,7 +147,7 @@ def get_sqs_queue(client: SQSServiceResource | S3ServiceResource | CloudWatchLog
     return queue
 
 
-def get_s3_bucket(s3: SQSServiceResource | S3ServiceResource | CloudWatchLogsClient, bucket_name: str) -> Bucket:
+def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) -> Bucket:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
@@ -195,6 +193,7 @@ initialize_cloudwatch_handler(cloudwatch_client, PROJECT_NAME, PROJECT_NAME)
 
 sqs_client = get_aws_service(AwsService.SQS, aws_session)
 queue = get_sqs_queue(sqs_client, PROJECT_NAME)
+print(queue)
 
 s3 = get_aws_service(AwsService.S3, aws_session)
 bucket = get_s3_bucket(s3, S3_BUCKET_NAME)
