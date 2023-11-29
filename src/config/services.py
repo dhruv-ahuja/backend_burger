@@ -22,8 +22,8 @@ import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
 
-from constants import app
-from constants import logger as log
+
+from .constants import logs as log, app
 
 
 class AwsService(str, Enum):
@@ -203,7 +203,7 @@ bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
 async def setup_services(_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to required services on app startup."""
 
-    path = pathlib.Path(log.LOG_DIRECTORY)
+    path = pathlib.Path(log.LOGS_DIRECTORY)
     initialize_logger(log.LOGGER_MESSAGE_FORMAT, path, log.LOGGER_FILENAME_FORMAT)
 
     await connect_to_mongodb(settings.db_url.get_secret_value(), [])
