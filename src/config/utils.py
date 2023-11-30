@@ -1,10 +1,11 @@
 from typing import Any
+
 from fastapi.exceptions import ValidationException
 from pydantic import ValidationError
 
 
 def parse_validation_error(exc: ValidationError | ValidationException) -> list[dict[str, Any]]:
-    """Parses and extracts required information from FastAPI endpoints' and Pydantic models' `ValidationError`s."""
+    """Parses and extracts required information from FastAPI endpoints' and Pydantic models' validation errors."""
 
     error_data: list[dict[str, Any]] = []
     errors = exc.errors()
