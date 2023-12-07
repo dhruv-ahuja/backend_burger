@@ -1,6 +1,7 @@
 amqp==5.2.0
 annotated-types==0.6.0
 anyio==3.7.1
+APScheduler==3.10.4
 beanie==1.23.6
 billiard==4.2.0
 boto3==1.28.85
@@ -42,6 +43,7 @@ pydantic_core==2.14.1
 pymongo==4.6.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
+pytz==2023.3.post1
 ruff==0.1.5
 s3transfer==0.7.0
 six==1.16.0
@@ -52,6 +54,7 @@ types-awscrt==0.19.10
 types-s3transfer==0.7.0
 typing_extensions==4.8.0
 tzdata==2023.3
+tzlocal==5.2
 urllib3==2.0.7
 uvicorn==0.24.0.post1
 vine==5.1.0

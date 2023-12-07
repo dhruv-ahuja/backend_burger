@@ -21,8 +21,11 @@ from loguru import logger
 import boto3.exceptions
 import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.job import Job
 
-
+from . import utils
 from .constants import logs as log, app
 
 
@@ -179,6 +182,18 @@ async def connect_to_mongodb(db_url: str, document_models: list) -> None:
     logger.info("successfully connected to database")
 
 
+def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> Job:
+    """Schedules the S3 log upload job to run once a week."""
+
+    job_id = "upload_s3_logs"
+    trigger = CronTrigger(day_of_week="sun", hour=00, minute=5)
+
+    job = utils.setup_job(scheduler, lambda: utils.gather_and_upload_s3_logs(bucket), job_id, trigger)
+    logger.info(f"scheduled '{job_id}' job to run weekly")
+
+    return job
+
+
 settings = generate_settings_config()
 
 aws_session = initialize_aws_session(
@@ -193,19 +208,23 @@ initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_N
 
 sqs_client = get_aws_service(AwsService.SQS, aws_session)
 queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
-print(queue)
 
 s3 = get_aws_service(AwsService.S3, aws_session)
 bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
 
+scheduler = BackgroundScheduler()
+
 
 @asynccontextmanager
 async def setup_services(_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
-    """Sets up connections to required services on app startup."""
+    """Sets up connections to and initializes required services on FastAPI app startup."""
 
     path = pathlib.Path(log.LOGS_DIRECTORY)
     initialize_logger(log.LOGGER_MESSAGE_FORMAT, path, log.LOGGER_FILENAME_FORMAT)
 
     await connect_to_mongodb(settings.db_url.get_secret_value(), [])
+
+    schedule_logs_upload_job(bucket, scheduler)
+    scheduler.start()
 
     yield
