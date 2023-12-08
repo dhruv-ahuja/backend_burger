@@ -157,13 +157,29 @@ def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) 
     s3 = t.cast(S3ServiceResource, s3)
 
     try:
-        bucket = s3.Bucket(bucket_name)
+        s3_bucket = s3.Bucket(bucket_name)
     except botocore.errorfactory.ClientError as ex:
         logger.error(f"error getting S3 bucket: {ex}")
         print(f"error getting S3 bucket: {ex}")
         raise
 
-    return bucket
+    return s3_bucket
+
+
+def initialize_aws_services(aws_session: boto3.Session) -> t.Tuple[Queue, Bucket]:
+    """Connects to all AWS services and returns AWS re-usable instances. Gathers all AWS services' initialization
+    function calls in one place."""
+
+    cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
+    initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
+
+    sqs_client = get_aws_service(AwsService.SQS, aws_session)
+    queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
+
+    s3 = get_aws_service(AwsService.S3, aws_session)
+    bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
+
+    return (queue, bucket)
 
 
 async def connect_to_mongodb(db_url: str, document_models: list) -> None:
@@ -194,37 +210,36 @@ def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> 
     return job
 
 
-settings = generate_settings_config()
-
-aws_session = initialize_aws_session(
-    settings.aws_access_key.get_secret_value(),
-    settings.aws_access_secret.get_secret_value(),
-    settings.aws_region_name,
-)
-
-# TODO: initialize these on fastapi startup
-cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
-initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
-
-sqs_client = get_aws_service(AwsService.SQS, aws_session)
-queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
-
-s3 = get_aws_service(AwsService.S3, aws_session)
-bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
-
-scheduler = BackgroundScheduler()
-
-
 @asynccontextmanager
-async def setup_services(_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
-    """Sets up connections to and initializes required services on FastAPI app startup."""
+async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
+    """Sets up connections to and initializes required services on FastAPI app startup. These services live throughout
+    the app's execution lifespan.\n
+    Injects re-usable services into the FastAPI application state, making them available to all route handler
+    functions."""
 
     path = pathlib.Path(log.LOGS_DIRECTORY)
     initialize_logger(log.LOGGER_MESSAGE_FORMAT, path, log.LOGGER_FILENAME_FORMAT)
 
+    settings = generate_settings_config()
+
+    aws_session = initialize_aws_session(
+        settings.aws_access_key.get_secret_value(),
+        settings.aws_access_secret.get_secret_value(),
+        settings.aws_region_name,
+    )
+    queue, s3_bucket = initialize_aws_services(aws_session)
+
     await connect_to_mongodb(settings.db_url.get_secret_value(), [])
 
-    schedule_logs_upload_job(bucket, scheduler)
+    scheduler = BackgroundScheduler()
+    schedule_logs_upload_job(s3_bucket, scheduler)
     scheduler.start()
 
+    # inject services into global app state
+    app.state.queue = queue
+    app.state.bucket = s3_bucket
+    app.state.scheduler = scheduler
+
     yield
+
+    scheduler.shutdown()
