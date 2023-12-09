@@ -1,5 +1,5 @@
 from beanie import Document
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pymongo import IndexModel
 
 from src.schemas.user import UserBase
@@ -8,7 +8,7 @@ from src.schemas.user import UserBase
 class User(UserBase, Document):
     """User represents a User of the application."""
 
-    password: str = Field(max_length=64)
+    password: SecretStr = Field(min_length=8, max_length=64)
 
     class Settings:
         """Defines the settings for the collection."""

@@ -16,12 +16,11 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> ErrorResponse | Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response | ErrorResponse:
         try:
             response = await call_next(request)
         except Exception as exc:
             logger.error(f"error when processing request: {exc}")
-            print(f"error when processing request: {exc}")
             return ERROR_RESPONSE
 
         return response

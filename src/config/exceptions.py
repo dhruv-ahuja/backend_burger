@@ -13,7 +13,7 @@ from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorRes
 ERROR_RESPONSE = AppResponse(
     content=BaseResponse(
         data=None,
-        error=BaseError(type_=ERROR_MAPPING[500].type_, message=ERROR_MAPPING[500].message),
+        error=BaseError(type=ERROR_MAPPING[500].type_, message=ERROR_MAPPING[500].message),
     ),
     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 )
@@ -37,6 +37,6 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
 
     response = BaseResponse(
         data=None,
-        error=BaseError(type_=ERROR_MAPPING[422].type_, message=ERROR_MAPPING[422].message),
+        error=BaseError(type=ERROR_MAPPING[422].type_, message=ERROR_MAPPING[422].message),
     )
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)

@@ -9,30 +9,37 @@ class UserInput(BaseModel):
 
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
-    input_password: SecretStr = Field(min_length=8, max_length=64)
+    password: SecretStr = Field(min_length=8, max_length=64)
 
     @validator("name")
-    def check_name_length(cls, input: str) -> None:
+    def check_name_length(cls, input: str) -> str:
         """Checks the entered name's validity."""
 
         if not 256 > len(input) >= 3:
             raise ValueError("Name length should be between 3 and 256 characters.")
 
+        return input
+
     # todo: add more stringent password checks
-    @validator("input_password")
-    def check_password_length(cls, input: SecretStr):
+    @validator("password")
+    def check_password_length(cls, input: SecretStr) -> SecretStr:
         """Checks the entered password's validity."""
 
         if not 65 > len(input) >= 8:
             raise ValueError("The password length should be between 8 and 64 characters.")
+
+        return input
 
 
 class UserBase(BaseModel):
     """UserBase is the base user model, representing User instances for API responses. Omits the
     password field for security."""
 
-    id: PydanticObjectId | None = None
+    # id: PydanticObjectId | None = None
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     date_created: dt.datetime = Field(default_factory=dt.datetime.now)
     date_updated: dt.datetime = Field(default_factory=dt.datetime.now)
+
+    class Config:
+        arbitrary_types_allowed = True
