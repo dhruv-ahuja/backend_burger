@@ -1,8 +1,8 @@
-from typing import Any, Generic, Self, Type, TypeAlias, TypeVar
+from typing import Any, Generic, TypeAlias, TypeVar
 
 import orjson
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, root_validator
 from starlette.status import HTTP_200_OK
 
 
@@ -28,15 +28,18 @@ class BaseResponse(BaseModel, Generic[T, E]):
     error: E | None = None
     key: str | None = Field(default=None, exclude=True)
 
-    # @model_validator(mode="after")
-    # def set_data_alias(self) -> Self:
-    #     """Wraps `data` field's value in a dictionary with key set to `key` field's value.\n
-    #     Example: `key` = 'users', `data`: List[User] => {}"""
+    @root_validator(skip_on_failure=True)
+    def nest_response_data(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Creates a sub-dictionary inside the response `data` dictionary, if a key value is set."""
 
-    #     if self.key is not None:
-    #         return BaseResponse(data={self.key: self.data})  # type: ignore
+        key = values.get("key")
+        if key is None:
+            return values
 
-    #     return self
+        data = values.pop("data")
+        values["data"] = {key: data}
+
+        return values
 
 
 class AppResponse(JSONResponse, Generic[T, E]):
@@ -47,23 +50,16 @@ class AppResponse(JSONResponse, Generic[T, E]):
         content: BaseResponse[T, E],
         status_code: int = HTTP_200_OK,
         headers: dict[str, str] | None = None,
-        # key: str | None = None,
     ) -> None:
         """Serialize the given content and pass it to parent class instance, initializing the custom AppResponse class.\n
         setting a `key` wraps the content inside a dictionary, like so: `{key: content}`."""
 
-        # serialize response object into dict; wrap the content inside a dictionary if key is set
         data = content.model_dump()
-        # if key:
-        #     data = {key: content.model_dump()}
-        #     print(data)
-        # else:
-        #     data = content.model_dump()
-        #     print(data)
-
         super().__init__(data, status_code, headers)
 
     def render(self, content: Any) -> bytes:
+        """Render the content as bytes, and return them to the client."""
+
         return orjson.dumps(content)
 
 
