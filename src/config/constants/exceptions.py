@@ -1,8 +1,14 @@
-from collections import namedtuple
+from typing import NamedTuple
 
-ERROR_MESSAGES = namedtuple("error_messages", ["type", "message"])
+
+class ErrorMessage(NamedTuple):
+    """ErrorMessage encapsulates an error's response code and response message."""
+
+    type_: str
+    message: str
+
 
 ERROR_MAPPING = {
-    422: ERROR_MESSAGES("validation_error", "Input failed validation."),
-    500: ERROR_MESSAGES("unknown_error", "An unknown error occured. Please try again later."),
+    422: ErrorMessage("validation_error", "Input failed validation."),
+    500: ErrorMessage("unknown_error", "An unknown error occured. Please try again later."),
 }

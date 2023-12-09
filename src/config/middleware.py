@@ -6,7 +6,7 @@ from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
-from src.schemas.exceptions import ERROR_RESPONSE
+from src.config.exceptions import ERROR_RESPONSE
 from src.schemas.responses import ErrorResponse
 
 

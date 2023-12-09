@@ -9,7 +9,7 @@ from starlette.status import HTTP_200_OK
 class BaseError(BaseModel):
     """Defines the base error structure in the application's base response."""
 
-    type: str
+    type_: str
     message: str
     fields: list[dict[str, Any]] | None = None
 
