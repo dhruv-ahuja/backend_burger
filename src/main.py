@@ -2,10 +2,9 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 
-from src.schemas.exceptions import handle_validation_exception
-
+from .config.exceptions import handle_validation_exception
+from .config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
 from .config.services import setup_services
-from .config.middleware import LoggingMiddleware, ExceptionHandlerMiddleware
 from .schemas.responses import AppResponse, BaseResponse
 
 app = FastAPI(lifespan=setup_services)
