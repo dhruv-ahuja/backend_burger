@@ -15,15 +15,9 @@ class BaseError(BaseModel):
 
 
 # * defining types here to avoid 'missing declarations' errors
-# T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document ordict return types
-T = TypeVar(
-    "T",
-    BaseModel,
-    list[BaseModel],
-    dict[str, Any],
-    list[dict[str, Any]],
-    None,
-)
+# T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document or dict return types
+# TODO: define apt type constraints, currently failing with BaseModel constraint
+T = TypeVar("T", Any, None)
 E = TypeVar("E", BaseError, None)
 
 
@@ -73,7 +67,7 @@ class AppResponse(JSONResponse, Generic[T, E]):
         return orjson.dumps(content)
 
 
-ErrorResponse: TypeAlias = AppResponse[None, BaseError]
+ErrorResponse: TypeAlias = AppResponse[None, E]
 
 SingleRecordResponse: TypeAlias = AppResponse[BaseModel, None]
 
