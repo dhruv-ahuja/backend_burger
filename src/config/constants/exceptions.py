@@ -1,6 +1,5 @@
 from collections import namedtuple
 
-
 ERROR_MESSAGES = namedtuple("error_messages", ["type", "message"])
 
 ERROR_MAPPING = {

@@ -9,9 +9,11 @@ from src.config.constants.exceptions import ERROR_MAPPING
 from src.config.utils import parse_validation_error
 from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorResponse
 
-
 ERROR_RESPONSE = AppResponse(
-    content=BaseResponse(data=None, error=BaseError(type=ERROR_MAPPING[500].type, message=ERROR_MAPPING[500].message)),
+    content=BaseResponse(
+        data=None,
+        error=BaseError(type=ERROR_MAPPING[500].type, message=ERROR_MAPPING[500].message),
+    ),
     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 )
 
@@ -33,6 +35,7 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
     logger.error(f"validation error at {path}: {error_data}")
 
     response = BaseResponse(
-        data=None, error=BaseError(type=ERROR_MAPPING[422].type, message=ERROR_MAPPING[422].message)
+        data=None,
+        error=BaseError(type=ERROR_MAPPING[422].type, message=ERROR_MAPPING[422].message),
     )
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)

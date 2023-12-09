@@ -1,33 +1,34 @@
-from contextlib import asynccontextmanager
-from enum import Enum
 import pathlib
 import sys
 import typing as t
+from contextlib import asynccontextmanager
+from enum import Enum
 
-from fastapi import FastAPI
+import beanie
 import boto3
+import boto3.exceptions
 import botocore
+import botocore.errorfactory
+from apscheduler.job import Job
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from boto3.resources.base import ServiceResource
+from fastapi import FastAPI
+from loguru import logger
+from motor.motor_asyncio import AsyncIOMotorClient
+from mypy_boto3_logs.client import CloudWatchLogsClient
 from mypy_boto3_s3 import S3ServiceResource
 from mypy_boto3_s3.service_resource import Bucket
 from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
-from mypy_boto3_logs.client import CloudWatchLogsClient
-from pydantic import SecretStr, Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
-import beanie
-from motor.motor_asyncio import AsyncIOMotorClient
-from loguru import logger
-import boto3.exceptions
-import botocore.errorfactory
 from watchtower import CloudWatchLogHandler
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
-from apscheduler.job import Job
+
+from src.models import document_models
 
 from . import utils
-from .constants import logs as log, app
-from src.models import document_models
+from .constants import app, logs
 
 
 class AwsService(str, Enum):
@@ -68,7 +69,11 @@ def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> bo
     """Creates and returns a Session object for connecting to AWS services."""
 
     try:
-        session = boto3.Session(aws_access_key_id=key_id, aws_secret_access_key=key_secret, region_name=region_name)
+        session = boto3.Session(
+            aws_access_key_id=key_id,
+            aws_secret_access_key=key_secret,
+            region_name=region_name,
+        )
     except boto3.exceptions.Boto3Error as ex:
         logger.error(f"error connecting to AWS: {ex}")
         raise
@@ -95,7 +100,10 @@ def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResou
 
 
 def initialize_logger(
-    format: str, path: pathlib.Path | None = None, filename: str | t.TextIO = sys.stderr, rotation: str | int = "00:00"
+    format: str,
+    path: pathlib.Path | None = None,
+    filename: str | t.TextIO = sys.stderr,
+    rotation: str | int = "00:00",
 ) -> None:
     """Initializes the logger with the given configuration parameters.\n
     Uses `rotation` and `path` only when supplying a log file name."""
@@ -128,7 +136,11 @@ def initialize_cloudwatch_handler(
     # * workaround to narrow the union type
     client = t.cast(CloudWatchLogsClient, client)
 
-    configuration = {"log_group_name": log_group, "log_group_retention_days": retention_period, "boto3_client": client}
+    configuration = {
+        "log_group_name": log_group,
+        "log_group_retention_days": retention_period,
+        "boto3_client": client,
+    }
     if log_stream is not None:
         configuration["log_stream_name"] = log_stream
 
@@ -161,7 +173,6 @@ def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) 
         s3_bucket = s3.Bucket(bucket_name)
     except botocore.errorfactory.ClientError as ex:
         logger.error(f"error getting S3 bucket: {ex}")
-        print(f"error getting S3 bucket: {ex}")
         raise
 
     return s3_bucket
@@ -218,8 +229,8 @@ async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     Injects re-usable services into the FastAPI application state, making them available to all route handler
     functions."""
 
-    path = pathlib.Path(log.LOGS_DIRECTORY)
-    initialize_logger(log.LOGGER_MESSAGE_FORMAT, path, log.LOGGER_FILENAME_FORMAT)
+    path = pathlib.Path(logs.LOGS_DIRECTORY)
+    initialize_logger(logs.LOGGER_MESSAGE_FORMAT, path, logs.LOGGER_FILENAME_FORMAT)
 
     settings = generate_settings_config()
 

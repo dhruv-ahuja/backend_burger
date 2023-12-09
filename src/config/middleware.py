@@ -1,10 +1,10 @@
-import uuid
 import time
+import uuid
 
 from fastapi import Request, Response
+from loguru import logger
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
-from loguru import logger
 
 from src.schemas.exceptions import ERROR_RESPONSE
 from src.schemas.responses import ErrorResponse

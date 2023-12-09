@@ -1,9 +1,9 @@
-from typing import Any, Type, TypeVar, Generic, TypeAlias
+from typing import Any, Generic, Type, TypeAlias, TypeVar
 
+import orjson
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.status import HTTP_200_OK
-import orjson
 
 
 class BaseError(BaseModel):
@@ -30,7 +30,10 @@ class AppResponse(JSONResponse, Generic[T, E]):
     """Application's core response type, enforces a set structure for the APIs' responses."""
 
     def __init__(
-        self, content: BaseResponse[T, E], status_code: int = HTTP_200_OK, headers: dict[str, str] | None = None
+        self,
+        content: BaseResponse[T, E],
+        status_code: int = HTTP_200_OK,
+        headers: dict[str, str] | None = None,
     ) -> None:
         # serialize response object into dict
         data = content.model_dump()
