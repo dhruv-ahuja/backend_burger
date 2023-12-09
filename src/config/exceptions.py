@@ -36,7 +36,6 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
     logger.error(f"validation error at {path}: {error_data}")
 
     response = BaseResponse(
-        data=None,
-        error=BaseError(type=ERROR_MAPPING[422].type_, message=ERROR_MAPPING[422].message),
+        data=None, error=BaseError(type=ERROR_MAPPING[422].type_, message=ERROR_MAPPING[422].message, fields=error_data)
     )
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
