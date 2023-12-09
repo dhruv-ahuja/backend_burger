@@ -1,5 +1,6 @@
 from typing import Any, Generic, Type, TypeAlias, TypeVar
 
+from beanie import Document
 import orjson
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -15,7 +16,16 @@ class BaseError(BaseModel):
 
 
 # * defining types here to avoid 'missing declarations' errors
-T = TypeVar("T", Type[BaseModel], dict[str, Any], None)
+# T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document ordict return types
+T = TypeVar(
+    "T",
+    Type[BaseModel] | Document,
+    list[Type[BaseModel] | Document],
+    dict[str, Any],
+    list[dict[str, Any]],
+    None,
+)
+D = TypeVar("D", Document, None)
 E = TypeVar("E", BaseError, None)
 
 
@@ -45,3 +55,7 @@ class AppResponse(JSONResponse, Generic[T, E]):
 
 
 ErrorResponse: TypeAlias = AppResponse[None, BaseError]
+
+SingleRecordResponse: TypeAlias = AppResponse[Type[BaseModel] | Document, None]
+
+MultiRecordResponse: TypeAlias = AppResponse[list[Type[BaseModel] | Document], None]
