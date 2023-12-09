@@ -27,6 +27,7 @@ from apscheduler.job import Job
 
 from . import utils
 from .constants import logs as log, app
+from src.models import document_models
 
 
 class AwsService(str, Enum):
@@ -182,7 +183,7 @@ def initialize_aws_services(aws_session: boto3.Session) -> t.Tuple[Queue, Bucket
     return (queue, bucket)
 
 
-async def connect_to_mongodb(db_url: str, document_models: list) -> None:
+async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Document]]) -> None:
     """Connects to the MongoDB database given its URL and list of Beanie `Document` modelss to create, after
     establishing connection."""
 
@@ -190,7 +191,7 @@ async def connect_to_mongodb(db_url: str, document_models: list) -> None:
 
     try:
         client = AsyncIOMotorClient(db_url)
-        await beanie.init_beanie(database=client.backendBurger, document_models=document_models)
+        await beanie.init_beanie(database=client.backendBurger, document_models=document_models)  # type: ignore
     except Exception as ex:
         logger.error(f"error initializing database connection: {ex}")
         raise
@@ -229,7 +230,7 @@ async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     )
     queue, s3_bucket = initialize_aws_services(aws_session)
 
-    await connect_to_mongodb(settings.db_url.get_secret_value(), [])
+    await connect_to_mongodb(settings.db_url.get_secret_value(), document_models)
 
     scheduler = BackgroundScheduler()
     schedule_logs_upload_job(s3_bucket, scheduler)
