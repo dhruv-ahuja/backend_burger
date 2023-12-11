@@ -49,11 +49,19 @@ class AppResponse(JSONResponse, Generic[T, E]):
         content: BaseResponse[T, E],
         status_code: int = HTTP_200_OK,
         headers: dict[str, str] | None = None,
+        use_dict: bool = False,
     ) -> None:
         """Serialize the given content and pass it to parent class instance, initializing the custom AppResponse class.\n
-        setting a `key` wraps the content inside a dictionary, like so: `{key: content}`."""
+        setting a `key` wraps the content inside a dictionary, like so: `{key: content}`.
 
-        data = content.model_dump()
+        `use_dict` specifies whether to use Pydantic's deprecated `dict` method on BaseModel instances, to prevent a
+        serialization bug with Beanie `ID`s."""
+
+        if use_dict:
+            data = content.dict()
+        else:
+            data = content.model_dump()
+
         super().__init__(data, status_code, headers)
 
     def render(self, content: Any) -> bytes:
