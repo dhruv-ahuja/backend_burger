@@ -6,19 +6,18 @@ from pydantic import BaseModel, Field, root_validator
 from starlette.status import HTTP_200_OK
 
 
+# T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document or dict return types
+# TODO: define apt type constraints, currently failing with BaseModel constraint
+T = TypeVar("T", Any, None)
+E = TypeVar("E", "BaseError", None)
+
+
 class BaseError(BaseModel):
     """Defines the base error structure in the application's base response."""
 
     type: str
     message: str
     fields: list[dict[str, Any]] | None = None
-
-
-# * defining types here to avoid 'missing declarations' errors
-# T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document or dict return types
-# TODO: define apt type constraints, currently failing with BaseModel constraint
-T = TypeVar("T", Any, None)
-E = TypeVar("E", BaseError, None)
 
 
 class BaseResponse(BaseModel, Generic[T, E]):
