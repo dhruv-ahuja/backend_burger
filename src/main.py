@@ -6,8 +6,11 @@ from .config.exceptions import handle_validation_exception
 from .config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
 from .config.services import setup_services
 from .schemas.responses import AppResponse, BaseResponse
+from .routers import user
 
 app = FastAPI(lifespan=setup_services)
+
+app.include_router(user.router)
 
 app.add_exception_handler(RequestValidationError, handle_validation_exception)
 app.add_exception_handler(ValidationError, handle_validation_exception)

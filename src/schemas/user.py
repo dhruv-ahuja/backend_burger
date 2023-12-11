@@ -35,11 +35,8 @@ class UserBase(BaseModel):
     """UserBase is the base user model, representing User instances for API responses. Omits the
     password field for security."""
 
-    # id: PydanticObjectId | None = None
+    id: PydanticObjectId | None = None
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     date_created: dt.datetime = Field(default_factory=dt.datetime.now)
     date_updated: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    class Config:
-        arbitrary_types_allowed = True
