@@ -27,8 +27,8 @@ from watchtower import CloudWatchLogHandler
 
 from src.models import document_models
 
-from . import utils
-from .constants import app, logs
+import src.config.utils as utils
+from src.config.constants import app, logs
 
 
 class AwsService(str, Enum):

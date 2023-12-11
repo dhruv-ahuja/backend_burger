@@ -4,11 +4,10 @@ from loguru import logger
 from pydantic import ValidationError
 from starlette import status
 
-from .constants.app import INTERNAL_SCHEMA_MODELS
-from .constants.exceptions import ERROR_MAPPING
-from .utils import parse_validation_error
 from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorResponse
-
+from src.config.constants.app import INTERNAL_SCHEMA_MODELS
+from src.config.constants.exceptions import ERROR_MAPPING
+from src.config.utils import parse_validation_error
 
 ERROR_RESPONSE = AppResponse(
     content=BaseResponse(
@@ -36,6 +35,11 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
     logger.error(f"validation error at {path}: {error_data}")
 
     response = BaseResponse(
-        data=None, error=BaseError(type=ERROR_MAPPING[422].type_, message=ERROR_MAPPING[422].message, fields=error_data)
+        data=None,
+        error=BaseError(
+            type=ERROR_MAPPING[422].type_,
+            message=ERROR_MAPPING[422].message,
+            fields=error_data,
+        ),
     )
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)

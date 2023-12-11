@@ -4,8 +4,8 @@ from loguru import logger
 from pymongo.errors import DuplicateKeyError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
-from ..models.user import User
-from ..schemas.user import UserBase, UserInput
+from src.models.user import User
+from src.schemas.user import UserBase, UserInput
 
 
 async def create_user(input: UserInput) -> PydanticObjectId | None:

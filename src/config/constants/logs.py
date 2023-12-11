@@ -1,5 +1,6 @@
 import os
 
+
 LOGS_DIRECTORY = os.path.expanduser("~/log/backend_burger")
 
 LOGS_DATETIME_FORMAT = "%d-%m-%Y"

@@ -10,7 +10,7 @@ from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
 from pydantic import ValidationError
 
-from .constants import app, logs
+from src.config.constants import app, logs
 
 
 def parse_validation_error(exc: ValidationError | ValidationException) -> list[dict[str, Any]]:
