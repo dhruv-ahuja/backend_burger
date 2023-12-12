@@ -2,7 +2,7 @@ from typing import Type
 
 import beanie
 
-from .user import User
+from .users import User
 
 
 # group and export models for initializing Beanie connection

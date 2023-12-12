@@ -2,7 +2,7 @@ from beanie import Document
 from pydantic import Field, SecretStr
 from pymongo import IndexModel
 
-from src.schemas.user import UserBase
+from src.schemas.users import UserBase
 
 
 class User(UserBase, Document):

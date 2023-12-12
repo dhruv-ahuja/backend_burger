@@ -2,8 +2,8 @@ from fastapi import APIRouter
 from loguru import logger
 
 from src.schemas.responses import AppResponse, BaseResponse
-from src.schemas.user import UserInput
-from src.services import user as service
+from src.schemas.users import UserInput
+from src.services import users as service
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
