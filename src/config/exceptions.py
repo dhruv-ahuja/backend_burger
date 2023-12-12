@@ -1,4 +1,4 @@
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.exceptions import ValidationException
 from loguru import logger
 from pydantic import ValidationError
@@ -8,6 +8,7 @@ from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorRes
 from src.config.constants.app import INTERNAL_SCHEMA_MODELS
 from src.config.constants.exceptions import ERROR_MAPPING
 from src.config.utils import parse_validation_error
+
 
 ERROR_RESPONSE = AppResponse(
     content=BaseResponse(
@@ -43,3 +44,29 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
         ),
     )
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
+async def handle_not_found_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+    """Structures general 404 error responses into the app's standard response type. Assigns a general message if no
+    custom message is given."""
+
+    path = request.url.path
+    logger.error(f"hit invalid enpoint: {path}")
+
+    error = ERROR_MAPPING[404]
+    message = exc.detail if exc.detail else error.message
+
+    response = BaseResponse(data=None, error=BaseError(type=error.type_, message=message))
+    return AppResponse(content=response, status_code=exc.status_code)
+
+
+async def handle_method_not_allowed_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+    """Returns a structured error response for the 405 error type."""
+
+    path = request.url.path
+    logger.error(f"request at endpoint {path} with invalid method {request.method}")
+
+    error = ERROR_MAPPING[405]
+
+    response = BaseResponse(data=None, error=BaseError(type=error.type_, message=error.message))
+    return AppResponse(content=response, status_code=exc.status_code)
