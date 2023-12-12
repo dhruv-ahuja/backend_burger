@@ -19,7 +19,9 @@ async def create_user(input: UserInput):
     logger.info("creating new user")
     user_id = await service.create_user(input)
 
-    return AppResponse(BaseResponse(data=str(user_id)))
+    # convert to string to avoid json serialization error
+    data = {"user_id": str(user_id)}
+    return AppResponse(BaseResponse(data=data))
 
 
 @router.get("/")
