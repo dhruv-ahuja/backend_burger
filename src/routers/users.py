@@ -19,7 +19,7 @@ async def create_user(input: UserInput):
     logger.info("creating new user")
     user_id = await service.create_user(input)
 
-    return AppResponse(BaseResponse(data=user_id), use_dict=True)
+    return AppResponse(BaseResponse(data=str(user_id)))
 
 
 @router.get("/")
