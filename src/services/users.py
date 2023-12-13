@@ -17,7 +17,7 @@ async def create_user(input: UserInput) -> PydanticObjectId | None:
         user = await user.insert()
     except DuplicateKeyError:
         logger.error("error creating user: duplicate email used")
-        raise HTTPException(HTTP_400_BAD_REQUEST, "email associated with another account")
+        raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
     except Exception as ex:
         logger.error(f"error creating user: {ex}; error type: {ex.__class__}")
         raise
@@ -61,7 +61,7 @@ async def get_user(user_id: str) -> UserBase:
         raise
 
     if user_record is None:
-        raise HTTPException(HTTP_404_NOT_FOUND, "user not found")
+        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
 
     user = UserBase(
         id=user_record.id,

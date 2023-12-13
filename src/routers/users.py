@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Path
 from loguru import logger
 
+from src.schemas.http import users as http
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserInput
 from src.services import users as service
@@ -9,10 +10,7 @@ from src.services import users as service
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-# TODO: define response examples
-
-
-@router.post("/")
+@router.post("/", responses=http.CREATE_USER_RESPONSES)
 async def create_user(input: UserInput):
     """Creates a user in the database and returns the user's ID."""
 
@@ -24,7 +22,7 @@ async def create_user(input: UserInput):
     return AppResponse(BaseResponse(data=data))
 
 
-@router.get("/")
+@router.get("/", responses=http.GET_USERS_RESPONSES)
 async def get_all_users():
     """Gets a list of all users from the database."""
 
@@ -34,8 +32,8 @@ async def get_all_users():
     return AppResponse(BaseResponse(data=users, key="users"), use_dict=True)
 
 
-@router.get("/{user_id}")
-async def get_user(user_id: str):
+@router.get("/{user_id}", responses=http.GET_USER_RESPONSES)
+async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_length=24)):
     """Fetches a single user from the databse, if the user exists."""
 
     logger.info(f"fetching user with id: {user_id}")

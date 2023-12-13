@@ -19,11 +19,11 @@ app = FastAPI(lifespan=setup_services)
 
 app.include_router(users.router)
 
+app.add_exception_handler(status.HTTP_400_BAD_REQUEST, handle_invalid_input_exception)
 app.add_exception_handler(RequestValidationError, handle_validation_exception)
 app.add_exception_handler(ValidationError, handle_validation_exception)
 app.add_exception_handler(status.HTTP_404_NOT_FOUND, handle_not_found_exception)
 app.add_exception_handler(status.HTTP_405_METHOD_NOT_ALLOWED, handle_method_not_allowed_exception)
-app.add_exception_handler(status.HTTP_400_BAD_REQUEST, handle_invalid_input_exception)
 
 app.add_middleware(ExceptionHandlerMiddleware)
 app.add_middleware(LoggingMiddleware)
