@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.types import ASGIApp
 
 from src.config.exceptions import ERROR_RESPONSE
-from src.schemas.responses import ErrorResponse
+from src.schemas.responses import AppErrorResponse
 
 
 class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
@@ -16,7 +16,7 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response | ErrorResponse:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response | AppErrorResponse:
         try:
             response = await call_next(request)
         except Exception as exc:

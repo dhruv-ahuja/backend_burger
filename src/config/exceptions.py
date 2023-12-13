@@ -4,7 +4,7 @@ from loguru import logger
 from pydantic import ValidationError
 from starlette import status
 
-from src.schemas.responses import AppResponse, BaseError, BaseResponse, ErrorResponse
+from src.schemas.responses import AppResponse, BaseError, BaseResponse, AppErrorResponse
 from src.config.constants.app import INTERNAL_SCHEMA_MODELS
 from src.config.constants.exceptions import ERROR_MAPPING
 from src.config.utils import parse_validation_error
@@ -19,7 +19,7 @@ ERROR_RESPONSE = AppResponse(
 )
 
 
-async def handle_validation_exception(request: Request, exc: ValidationError | ValidationException) -> ErrorResponse:
+async def handle_validation_exception(request: Request, exc: ValidationError | ValidationException) -> AppErrorResponse:
     """Catches, parses and converts FastAPI endpoints' parameter and Pydantic models' validation exception into a
     standard error response.\n
     Raises an internal 500 error if an invalid internal Pydantic model caused the error."""
@@ -46,7 +46,7 @@ async def handle_validation_exception(request: Request, exc: ValidationError | V
     return AppResponse(content=response, status_code=status.HTTP_422_UNPROCESSABLE_ENTITY)
 
 
-async def handle_not_found_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+async def handle_not_found_exception(request: Request, exc: HTTPException) -> AppErrorResponse:
     """Structures general 404 error responses into the app's standard response type. Assigns a general message if no
     custom message is given."""
 
@@ -60,7 +60,7 @@ async def handle_not_found_exception(request: Request, exc: HTTPException) -> Er
     return AppResponse(content=response, status_code=exc.status_code)
 
 
-async def handle_method_not_allowed_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+async def handle_method_not_allowed_exception(request: Request, exc: HTTPException) -> AppErrorResponse:
     """Returns a structured error response for the 405 error type."""
 
     path = request.url.path
@@ -72,7 +72,7 @@ async def handle_method_not_allowed_exception(request: Request, exc: HTTPExcepti
     return AppResponse(content=response, status_code=exc.status_code)
 
 
-async def handle_invalid_input_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+async def handle_invalid_input_exception(request: Request, exc: HTTPException) -> AppErrorResponse:
     """Structures 400 error responses into the app's standard response type."""
 
     path = request.url.path

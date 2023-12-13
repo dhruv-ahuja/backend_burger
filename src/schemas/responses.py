@@ -3,6 +3,7 @@ from typing import Any, Generic, TypeAlias, TypeVar
 import orjson
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, root_validator
+
 from starlette.status import HTTP_200_OK
 
 
@@ -70,8 +71,4 @@ class AppResponse(JSONResponse, Generic[T, E]):
         return orjson.dumps(content)
 
 
-ErrorResponse: TypeAlias = AppResponse[None, E]
-
-SingleRecordResponse: TypeAlias = AppResponse[BaseModel, None]
-
-MultiRecordResponse: TypeAlias = AppResponse[list[BaseModel], None]
+AppErrorResponse: TypeAlias = AppResponse[None, E]
