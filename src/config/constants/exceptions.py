@@ -9,6 +9,7 @@ class Error(NamedTuple):
 
 
 ERROR_MAPPING = {
+    400: Error("invalid_input", "Input is invalid."),
     404: Error("resource_not_found", "Resource not found."),
     405: Error("method_not_allowed", "Method not allowed."),
     422: Error("validation_error", "Input failed validation."),

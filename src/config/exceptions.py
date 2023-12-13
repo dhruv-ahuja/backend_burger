@@ -70,3 +70,16 @@ async def handle_method_not_allowed_exception(request: Request, exc: HTTPExcepti
 
     response = BaseResponse(data=None, error=BaseError(type=error.type_, message=error.message))
     return AppResponse(content=response, status_code=exc.status_code)
+
+
+async def handle_invalid_input_exception(request: Request, exc: HTTPException) -> ErrorResponse:
+    """Structures 400 error responses into the app's standard response type."""
+
+    path = request.url.path
+    logger.error(f"request at endpoint {path} with invalid method {request.method}")
+
+    error = ERROR_MAPPING[400]
+    message = exc.detail if exc.detail else error.message
+
+    response = BaseResponse(data=None, error=BaseError(type=error.type_, message=message))
+    return AppResponse(content=response, status_code=exc.status_code)
