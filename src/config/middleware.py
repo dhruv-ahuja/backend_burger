@@ -1,5 +1,5 @@
-import time
 import uuid
+import asyncio
 
 from fastapi import Request, Response
 from loguru import logger
@@ -34,14 +34,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = str(uuid.uuid4())
+        event_loop = asyncio.get_event_loop()
 
         with logger.contextualize(request_id=request_id):
-            start_time = time.time()
+            start_time = event_loop.time()
             response: Response = await call_next(request)
-            end_time = start_time - time.time()
+            execution_time = event_loop.time() - start_time
 
             logger.info(
-                f"Completed request: {request.method} {request.url} | time: {end_time} | status: {response.status_code}"
+                f"Completed request: {request.method} {request.url} | time: {execution_time} | status: {response.status_code}"
             )
 
         return response
