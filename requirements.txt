@@ -12,6 +12,7 @@ click==8.1.7
 click-didyoumean==0.3.0
 click-plugins==1.1.1
 click-repl==0.3.0
+coverage==7.3.3
 dnspython==2.4.2
 email-validator==2.1.0.post1
 fastapi==0.104.1
@@ -19,6 +20,7 @@ gunicorn==21.2.0
 h11==0.14.0
 httptools==0.6.1
 idna==3.4
+iniconfig==2.0.0
 isort==5.12.0
 jmespath==1.0.1
 kombu==5.3.4
@@ -36,12 +38,15 @@ mypy-boto3-s3==1.28.55
 mypy-boto3-sqs==1.28.82
 orjson==3.9.10
 packaging==23.2
+pluggy==1.3.0
 prompt-toolkit==3.0.41
 pycurl==7.45.2
 pydantic==2.5.0
 pydantic-settings==2.1.0
 pydantic_core==2.14.1
 pymongo==4.6.0
+pytest==7.4.3
+pytest-cov==4.1.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 pytz==2023.3.post1
