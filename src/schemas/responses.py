@@ -1,9 +1,8 @@
 from typing import Any, Generic, TypeAlias, TypeVar
 
-import orjson
 from fastapi.responses import JSONResponse
+import orjson
 from pydantic import BaseModel, Field, root_validator
-
 from starlette.status import HTTP_200_OK
 
 

@@ -11,11 +11,11 @@ router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.post("/", responses=http.CREATE_USER_RESPONSES)
-async def create_user(input: UserInput):
+async def create_user(user_input: UserInput):
     """Creates a user in the database and returns the user's ID."""
 
     logger.info("creating new user")
-    user_id = await service.create_user(input)
+    user_id = await service.create_user(user_input)
 
     # convert to string to avoid json serialization error
     data = {"user_id": str(user_id)}

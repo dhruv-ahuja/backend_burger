@@ -8,10 +8,10 @@ from src.models.users import User
 from src.schemas.users import UserBase, UserInput
 
 
-async def create_user(input: UserInput) -> PydanticObjectId | None:
+async def create_user(user_input: UserInput) -> PydanticObjectId | None:
     """Creates a user in the database, and returns the updated user object."""
 
-    user = User(name=input.name, email=input.email, password=input.password)
+    user = User(name=user_input.name, email=user_input.email, password=user_input.password)
 
     try:
         user = await user.insert()
