@@ -23,6 +23,7 @@ def parse_validation_error(exc: ValidationError | ValidationException) -> list[d
         error_type: str = error["type"]
 
         if error_type.endswith("_parsing"):
+            print(error)
             expected_type = error_type.split("_parsing")[0]
             error_type = "expected_" + expected_type
 
@@ -93,12 +94,12 @@ def setup_job(
     function: Callable,
     job_id: str | None = None,
     trigger: BaseTrigger | None = None,
-    misfire_grace_time: int = 60,
+    misfire_grace_time: int | None = 60,
     *args,
     **kwargs,
 ) -> Job:
     """Creates a background job with the given parameters and registers it with the scheduler."""
 
-    job = scheduler.add_job(function, trigger, args, kwargs, job_id, misfire_grace_tim=misfire_grace_time)
+    job = scheduler.add_job(function, trigger, args, kwargs, job_id, misfire_grace_time=misfire_grace_time)
 
     return job
