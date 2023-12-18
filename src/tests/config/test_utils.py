@@ -1,21 +1,25 @@
 import datetime as dt
+import time
 from typing import Any
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.date import DateTrigger
 from fastapi.exceptions import ValidationException
+from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
 from pydantic import ValidationError
 from pyfakefs.fake_filesystem import FakeFilesystem
 import pytest
-from pytest import FixtureRequest
+from pytest import FixtureRequest, LogCaptureFixture
 from pytest_mock import MockerFixture
 from pytest_mock.plugin import MockType
 
 from src.config.constants.app import PROJECT_NAME, S3_FOLDER_NAME
 from src.config.constants.logs import LOGS_DATETIME_FORMAT
-from src.config.utils import gather_logs, parse_validation_error, upload_logs
+from src.config.utils import gather_logs, parse_validation_error, upload_logs, setup_job
 
 
-@pytest.fixture()
+@pytest.fixture
 def generate_line_errors(request: FixtureRequest) -> list[dict[str, Any]]:
     """Generate line_errors list to be used with `parse_validation_error` test functions."""
 
@@ -34,14 +38,21 @@ def generate_line_errors(request: FixtureRequest) -> list[dict[str, Any]]:
         "input": 2,
         "url": "https://errors.pydantic.dev/2.5/v/string_type",
     }
+    int_parsing_error = {
+        "type": "int_parsing",
+        "loc": ("i",),
+        "msg": "Input should be a valid integer, unable to parse string as an integer",
+        "input": "a",
+        "url": "https://errors.pydantic.dev/2.5/v/int_parsing",
+    }
 
     return_errors: bool = request.param
     if not return_errors:
         return []
-    return [length_error, string_type_error]
+    return [length_error, string_type_error, int_parsing_error]
 
 
-@pytest.fixture()
+@pytest.fixture
 def init_validation_error(
     generate_line_errors: list[dict[str, Any]], request: FixtureRequest
 ) -> ValidationError | ValidationException:
@@ -64,6 +75,7 @@ def test_parse_validation_error_valid_input(
     expected_value = [
         {"error_type": "string_too_short", "field": "name"},
         {"error_type": "string_type", "field": "password"},
+        {"error_type": "expected_int", "field": "i"},
     ]
 
     assert parse_validation_error(init_validation_error) == expected_value
@@ -80,29 +92,41 @@ def test_parse_validation_error_empty_input(
     assert parse_validation_error(init_validation_error) == []
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_os_listdir(mocker: MockerFixture) -> MockType:
     """Patches the `os.listdir` function, preparing it to be further modified in a test function or fixture."""
 
     return mocker.patch("os.listdir")
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_s3_bucket(mocker: MockerFixture) -> MockType:
     """Patches the s3 `Bucket` object, preparing it to be further modified in a test function or fixture."""
 
     return mocker.Mock(spec=Bucket)
 
 
-@pytest.fixture()
-def generate_logs(fs: FakeFilesystem) -> list[tuple[str, str]]:
+@pytest.fixture
+def generate_logs(request: FixtureRequest, fs: FakeFilesystem) -> list[tuple[str, str]]:
     """Generates fake logs directory and some fake logs for the past 7 days, to be used to test the logs-based utility
-    functions."""
+    functions. Returns an incorrectly formatted log file name to test exception flow if request param set is falsy."""
 
     logs_directory = fs.create_dir("/logs")
     logs_paths = []
 
     today = dt.datetime.today()
+
+    valid_logs = request.param
+
+    # return an incorrectly formatted log file
+    if not valid_logs:
+        file_name = "invalid.log"
+        file_path = f"/logs/{file_name}"
+
+        file_ = fs.create_file(file_name)
+        logs_directory.add_entry(file_)
+
+        return [(file_path, file_name)]
 
     # generate fake log files for the last 7 days by increasing date difference
     i = 1
@@ -112,9 +136,9 @@ def generate_logs(fs: FakeFilesystem) -> list[tuple[str, str]]:
         file_name = PROJECT_NAME + "_" + previous_date.strftime(LOGS_DATETIME_FORMAT) + ".log"
 
         file_path = f"/logs/{file_name}"
-        file = fs.create_file(file_name)
+        file_ = fs.create_file(file_name)
 
-        logs_directory.add_entry(file)
+        logs_directory.add_entry(file_)
         logs_paths.append((file_path, file_name))
 
         i += 1
@@ -122,6 +146,7 @@ def generate_logs(fs: FakeFilesystem) -> list[tuple[str, str]]:
     return logs_paths
 
 
+@pytest.mark.parametrize("generate_logs", [True], indirect=True)
 def test_gather_logs(generate_logs: list[tuple[str, str]], mock_os_listdir: MockType) -> None:
     """Tests the `gather_logs` function by passing it a mocked `os.listdir` function call, and checks whether it
     correctly gathers logs for the past 7 days."""
@@ -143,12 +168,37 @@ def test_gather_logs(generate_logs: list[tuple[str, str]], mock_os_listdir: Mock
     assert returned_logs_paths == logs_paths
 
 
+@pytest.mark.parametrize("generate_logs", [False], indirect=True)
+def test_gather_logs_invalid(
+    generate_logs: list[tuple[str, str]], mock_os_listdir: MockType, caplog: LogCaptureFixture
+) -> None:
+    """Tests the `gather_logs` function by passing it a mocked `os.listdir` function call, and checks whether it
+    correctly logs a warning for an invalid log file."""
+
+    logs_paths = generate_logs
+    os_logs_files = []
+
+    # prepare log file names to pass as mocked return type
+    for _, file_name in logs_paths:
+        os_logs_files.append(file_name)
+
+    upload_count = 7
+    logs_directory = "/logs"
+
+    mock_os_listdir.return_value = os_logs_files
+
+    gather_logs(logs_directory, upload_count, LOGS_DATETIME_FORMAT)
+
+    assert "log file name 'invalid.log' has invalid formattig"
+
+
 def mocked_upload_function(source: str, destination: str) -> tuple[str, str]:
     """Mocked upload function to be used instead of the actual S3 bucket's upload function."""
 
     return source, destination
 
 
+@pytest.mark.parametrize("generate_logs", [True], indirect=True)
 def test_upload_logs(generate_logs: list[tuple[str, str]], mock_s3_bucket: MockType) -> None:
     """Tests the `upload_logs` function by passing it a mocked S3 bucket, and checks whether it correctly processes the
     passed logs' paths."""
@@ -163,3 +213,36 @@ def test_upload_logs(generate_logs: list[tuple[str, str]], mock_s3_bucket: MockT
     for log_path, file_name in logs_paths:
         expected_s3_path = f"{S3_FOLDER_NAME}/{file_name}"
         mock_s3_bucket.upload_file.assert_any_call(log_path, expected_s3_path)
+
+
+@pytest.fixture
+def get_scheduler():
+    """Yields a background scheduler instance, and gracefully shuts it down post-testing."""
+
+    scheduler = BackgroundScheduler()
+    yield scheduler
+    scheduler.shutdown()
+
+
+def test_setup_job(get_scheduler: BackgroundScheduler, caplog: LogCaptureFixture):
+    """Tests setting up a job with APScheduler and checks its properties."""
+
+    def sample_job():
+        logger.info("running sample job")
+
+    scheduler = get_scheduler
+
+    job_id = "sample_job"
+    trigger = DateTrigger(run_date=dt.datetime.now())
+    misfire_grace_time = None
+
+    job = setup_job(scheduler, sample_job, job_id, trigger, misfire_grace_time)
+
+    assert job.id == job_id
+    assert job.trigger == trigger
+    assert job.misfire_grace_time is None
+
+    scheduler.start()
+    time.sleep(0.3)
+
+    assert "running sample job" in caplog.text
