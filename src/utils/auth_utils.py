@@ -8,6 +8,6 @@ def hash_value(value: str) -> str:
 
 
 def compare_values(value: str, hashed_value: str) -> bool:
-    """Compares a normaltext value with a hashed value and confirms whether they are same."""
+    """Compares a plain-text value with a hashed value and confirms whether they are same."""
 
     return argon2.verify(value, hashed_value)
