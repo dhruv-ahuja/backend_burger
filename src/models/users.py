@@ -8,7 +8,8 @@ from src.schemas.users import UserBase
 class User(UserBase, Document):
     """User represents a User of the application."""
 
-    password: SecretStr = Field(min_length=8, max_length=64)
+    # * high max_length to accomodate hashed password value
+    password: SecretStr = Field(min_length=8, max_length=256)
 
     class Settings:
         """Defines the settings for the collection."""
