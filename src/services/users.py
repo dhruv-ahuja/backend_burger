@@ -1,4 +1,5 @@
 from beanie import PydanticObjectId
+from beanie.operators import Set
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
@@ -6,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from src.models.users import User
-from src.schemas.users import UserBase, UserInput
+from src.schemas.users import UserBase, UserInput, UserUpdateInput
 from src.utils import auth_utils
 
 
@@ -56,6 +57,8 @@ async def get_users() -> list[UserBase]:
 async def get_user(user_id: str) -> UserBase:
     """Fetches and returns a user from the database, if user exists, given the user ID."""
 
+    # TODO: invalid user_id should raise a 400 error!
+    # TODO: remove ID from logger statement -- already added in 1st logger statement
     try:
         id_ = PydanticObjectId(user_id)
         user_record = await User.get(id_)
@@ -74,3 +77,26 @@ async def get_user(user_id: str) -> UserBase:
         date_updated=user_record.date_updated,
     )
     return user
+
+
+async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
+    """Updates a user in the database, if the user exists, given the user ID."""
+
+    # does not raise an error on invalid user
+    try:
+        id_ = PydanticObjectId(user_id)
+        user = await User.get(id_)
+    except Exception as ex:
+        print(ex)
+        raise
+
+    if user is None:
+        raise HTTPException(HTTP_404_NOT_FOUND, "User not found")
+
+    user.name = user_input.name
+    user.email = user_input.email
+
+    try:
+        await user.replace()
+    except Exception as ex:
+        logger.error(f"error updating user: {ex}")

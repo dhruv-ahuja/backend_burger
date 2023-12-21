@@ -22,6 +22,13 @@ class UserInput(BaseModel):
     #     return input
 
 
+class UserUpdateInput(BaseModel):
+    """UserUpdateInput holds the user's input during the user details' update process. Does not hold user's password."""
+
+    name: str = Field(min_length=3, max_length=255)
+    email: EmailStr
+
+
 class UserBase(BaseModel):
     """UserBase is the base user model, representing User instances for API responses. Omits the
     password field for security."""

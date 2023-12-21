@@ -3,7 +3,7 @@ from loguru import logger
 
 from src.schemas.http import users as http
 from src.schemas.responses import AppResponse, BaseResponse
-from src.schemas.users import UserInput
+from src.schemas.users import UserInput, UserUpdateInput
 from src.services import users as service
 
 
@@ -40,3 +40,11 @@ async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_
     user = await service.get_user(user_id)
 
     return AppResponse(BaseResponse(data=user))
+
+
+@router.put("/{user_id}", status_code=204)
+async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_length=24, max_length=24)):
+    """Updates a single user in the database, if the user exists."""
+
+    logger.info(f"updating user with id: {user_id}")
+    await service.update_user(user_id, user_input)
