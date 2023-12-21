@@ -1,5 +1,6 @@
 from beanie import PydanticObjectId
 from beanie.operators import Set
+import bson.errors
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
@@ -57,13 +58,14 @@ async def get_users() -> list[UserBase]:
 async def get_user(user_id: str) -> UserBase:
     """Fetches and returns a user from the database, if user exists, given the user ID."""
 
-    # TODO: invalid user_id should raise a 400 error!
-    # TODO: remove ID from logger statement -- already added in 1st logger statement
     try:
         id_ = PydanticObjectId(user_id)
         user_record = await User.get(id_)
+    except bson.errors.InvalidId:
+        logger.error("received invalid user_id")
+        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
     except Exception as ex:
-        logger.error(f"error fetching user with id: {id}: {ex}")
+        logger.error(f"error fetching user: {ex}")
         raise
 
     if user_record is None:
@@ -86,12 +88,15 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
     try:
         id_ = PydanticObjectId(user_id)
         user = await User.get(id_)
+    except bson.errors.InvalidId:
+        logger.error("received invalid user_id")
+        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
     except Exception as ex:
-        print(ex)
+        logger.error(f"error fetching user for update: {ex}")
         raise
 
     if user is None:
-        raise HTTPException(HTTP_404_NOT_FOUND, "User not found")
+        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
 
     user.name = user_input.name
     user.email = user_input.email
@@ -99,4 +104,4 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
     try:
         await user.replace()
     except Exception as ex:
-        logger.error(f"error updating user: {ex}")
+        logger.error(f"error updating user details: {ex}")

@@ -42,8 +42,8 @@ async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_
     return AppResponse(BaseResponse(data=user))
 
 
-@router.put("/{user_id}", status_code=204)
-async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_length=24, max_length=24)):
+@router.put("/{user_id}", status_code=204, responses=http.UPDATE_USER_RESPONSES)
+async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_length=24, max_length=24)) -> None:
     """Updates a single user in the database, if the user exists."""
 
     logger.info(f"updating user with id: {user_id}")
