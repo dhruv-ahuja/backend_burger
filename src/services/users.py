@@ -1,5 +1,4 @@
 from beanie import PydanticObjectId
-from beanie.operators import Set
 import bson.errors
 from fastapi import HTTPException
 from loguru import logger
@@ -55,12 +54,12 @@ async def get_users() -> list[UserBase]:
     return users
 
 
-async def get_user(user_id: str) -> UserBase:
-    """Fetches and returns a user from the database, if user exists, given the user ID."""
+async def get_user_from_database(user_id: str) -> User:
+    """Fetches a user from the database, raising an error if the given user_id is invalid or the user does not exist."""
 
     try:
         id_ = PydanticObjectId(user_id)
-        user_record = await User.get(id_)
+        user = await User.get(id_)
     except bson.errors.InvalidId:
         logger.error("received invalid user_id")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
@@ -68,8 +67,16 @@ async def get_user(user_id: str) -> UserBase:
         logger.error(f"error fetching user: {ex}")
         raise
 
-    if user_record is None:
+    if user is None:
         raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
+
+    return user
+
+
+async def get_user(user_id: str) -> UserBase:
+    """Fetches and returns a user from the database, if user exists, given the user ID."""
+
+    user_record = await get_user_from_database(user_id)
 
     user = UserBase(
         id=user_record.id,
@@ -84,18 +91,7 @@ async def get_user(user_id: str) -> UserBase:
 async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
     """Updates a user in the database, if the user exists, given the user ID."""
 
-    try:
-        id_ = PydanticObjectId(user_id)
-        user = await User.get(id_)
-    except bson.errors.InvalidId:
-        logger.error("received invalid user_id")
-        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
-    except Exception as ex:
-        logger.error(f"error fetching user for update: {ex}")
-        raise
-
-    if user is None:
-        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
+    user = await get_user_from_database(user_id)
 
     user.name = user_input.name
     user.email = user_input.email
@@ -110,18 +106,7 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
 async def delete_user(user_id: str) -> None:
     """Deletes a user from the database, if the user exists, given the user ID."""
 
-    try:
-        id_ = PydanticObjectId(user_id)
-        user = await User.get(id_)
-    except bson.errors.InvalidId:
-        logger.error("received invalid user_id")
-        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
-    except Exception as ex:
-        logger.error(f"error fetching user: {ex}")
-        raise
-
-    if user is None:
-        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
+    user = await get_user_from_database(user_id)
 
     try:
         await user.delete()
