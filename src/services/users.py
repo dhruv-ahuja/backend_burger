@@ -104,6 +104,7 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
         await user.replace()
     except Exception as ex:
         logger.error(f"error updating user details: {ex}")
+        raise
 
 
 async def delete_user(user_id: str) -> None:
