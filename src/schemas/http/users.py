@@ -77,7 +77,20 @@ GET_USERS_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     **COMMON_RESPONSES,
 }
 
+
+INVALID_USER_ID_RESPONSE = {
+    "data": None,
+    "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None},
+}
+
+
+USER_NOT_FOUND_RESPONSE = {
+    "data": None,
+    "error": {"type": "resource_not_found", "message": "User not found.", "fields": None},
+}
+
 GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
+    **COMMON_RESPONSES,
     200: {
         "content": {
             "application/json": {
@@ -94,27 +107,8 @@ GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
             },
         },
     },
-    400: {
-        "content": {
-            "application/json": {
-                "example": {
-                    "data": None,
-                    "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None},
-                },
-            }
-        }
-    },
-    404: {
-        "content": {
-            "application/json": {
-                "example": {
-                    "data": None,
-                    "error": {"type": "resource_not_found", "message": "User not found.", "fields": None},
-                },
-            }
-        },
-        "data": None,
-    },
+    400: {"content": {"application/json": {"example": INVALID_USER_ID_RESPONSE}}},
+    404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},
     422: {
         "content": {
             "application/json": {
@@ -130,34 +124,13 @@ GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
         },
         "data": None,
     },
-    **COMMON_RESPONSES,
 }
 
+
 UPDATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
-    400: {
-        "content": {
-            "application/json": {
-                "example": {
-                    "data": None,
-                    "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None},
-                },
-            }
-        }
-    },
-    404: {
-        "content": {
-            "application/json": {
-                "example": [
-                    {
-                        "data": None,
-                        "error": {"type": "resource_not_found", "message": "User not found.", "fields": None},
-                    },
-                    {"data": None, "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None}},
-                ]
-            }
-        },
-        "data": None,
-    },
+    **COMMON_RESPONSES,
+    400: {"content": {"application/json": {"example": INVALID_USER_ID_RESPONSE}}},
+    404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},
     422: {
         "content": {
             "application/json": {
@@ -173,34 +146,12 @@ UPDATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
         },
         "data": None,
     },
-    **COMMON_RESPONSES,
 }
 
 DELETE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     **COMMON_RESPONSES,
-    400: {
-        "content": {
-            "application/json": {
-                "example": {
-                    "data": None,
-                    "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None},
-                },
-            }
-        }
-    },
-    404: {
-        "content": {
-            "application/json": {
-                "example": [
-                    {
-                        "data": None,
-                        "error": {"type": "resource_not_found", "message": "User not found.", "fields": None},
-                    },
-                ]
-            }
-        },
-        "data": None,
-    },
+    400: {"content": {"application/json": {"example": INVALID_USER_ID_RESPONSE}}},
+    404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},
     422: {
         "content": {
             "application/json": {
