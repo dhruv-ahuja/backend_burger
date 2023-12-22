@@ -94,4 +94,4 @@ async def handle_auth_exception(request: Request, exc: HTTPException) -> AppErro
     error = ERROR_MAPPING[exc.status_code]
 
     response = BaseResponse(data=None, error=BaseError(type=error.type_, message=error.message))
-    return AppResponse(content=response, status_code=exc.status_code)
+    return AppResponse(content=response, status_code=exc.status_code, headers=exc.headers)
