@@ -84,7 +84,6 @@ async def get_user(user_id: str) -> UserBase:
 async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
     """Updates a user in the database, if the user exists, given the user ID."""
 
-    # does not raise an error on invalid user
     try:
         id_ = PydanticObjectId(user_id)
         user = await User.get(id_)
@@ -105,3 +104,26 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
         await user.replace()
     except Exception as ex:
         logger.error(f"error updating user details: {ex}")
+
+
+async def delete_user(user_id: str) -> None:
+    """Deletes a user from the database, if the user exists, given the user ID."""
+
+    try:
+        id_ = PydanticObjectId(user_id)
+        user = await User.get(id_)
+    except bson.errors.InvalidId:
+        logger.error("received invalid user_id")
+        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
+    except Exception as ex:
+        logger.error(f"error fetching user: {ex}")
+        raise
+
+    if user is None:
+        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
+
+    try:
+        await user.delete()
+    except Exception as ex:
+        logger.error(f"error deleting user: {ex}")
+        raise

@@ -175,3 +175,45 @@ UPDATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     },
     **COMMON_RESPONSES,
 }
+
+DELETE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
+    **COMMON_RESPONSES,
+    400: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": None,
+                    "error": {"type": "invalid_input", "message": "Invalid user_id.", "fields": None},
+                },
+            }
+        }
+    },
+    404: {
+        "content": {
+            "application/json": {
+                "example": [
+                    {
+                        "data": None,
+                        "error": {"type": "resource_not_found", "message": "User not found.", "fields": None},
+                    },
+                ]
+            }
+        },
+        "data": None,
+    },
+    422: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": None,
+                    "error": {
+                        "type": "validation_error",
+                        "message": "Input failed validation.",
+                        "fields": [{"error_type": "string_too_short", "field": "user_id"}],
+                    },
+                }
+            }
+        },
+        "data": None,
+    },
+}
