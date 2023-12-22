@@ -1,3 +1,4 @@
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Path
 from loguru import logger
 
@@ -33,8 +34,8 @@ async def get_all_users():
 
 
 @router.get("/{user_id}", responses=resp.GET_USER_RESPONSES)
-async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_length=24)):
-    """Fetches a single user from the databse, if the user exists."""
+async def get_user(user_id: PydanticObjectId):
+    """Fetches a single user from the database, if the user exists."""
 
     logger.info(f"fetching user with id: {user_id}")
     user = await service.get_user(user_id)
@@ -43,7 +44,7 @@ async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_
 
 
 @router.put("/{user_id}", status_code=204, responses=resp.UPDATE_USER_RESPONSES)
-async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_length=24, max_length=24)) -> None:
+async def update_user(user_input: UserUpdateInput, user_id: PydanticObjectId) -> None:
     """Updates a single user in the database, if the user exists."""
 
     logger.info(f"updating user with id: {user_id}")
@@ -51,7 +52,7 @@ async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_
 
 
 @router.delete("/{user_id}", status_code=204, responses=resp.DELETE_USER_RESPONSES)
-async def delete_user(user_id: str = Path(..., min_length=24, max_length=24)) -> None:
+async def delete_user(user_id: PydanticObjectId) -> None:
     """Deletes a single user from the database, if the user exists."""
 
     logger.info(f"deleting user with id: {user_id}")

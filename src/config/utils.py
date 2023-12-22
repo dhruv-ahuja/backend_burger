@@ -23,7 +23,6 @@ def parse_validation_error(exc: ValidationError | ValidationException) -> list[d
         error_type: str = error["type"]
 
         if error_type.endswith("_parsing"):
-            print(error)
             expected_type = error_type.split("_parsing")[0]
             error_type = "expected_" + expected_type
 

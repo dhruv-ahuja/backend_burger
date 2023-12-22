@@ -1,6 +1,5 @@
 from typing import cast
 from beanie import PydanticObjectId
-import bson.errors
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
@@ -55,16 +54,12 @@ async def get_users() -> list[UserBase]:
     return users
 
 
-async def get_user_from_database(user_id: str, missing_user_error: bool = True) -> User | None:
+async def get_user_from_database(user_id: PydanticObjectId | None, missing_user_error: bool = True) -> User | None:
     """Fetches a user from the database, raising a 400 error if the given `user_id` is invalid. Raises a 404 error if
     the user does not exist and `missing_user_error` is `True`."""
 
     try:
-        id_ = PydanticObjectId(user_id)
-        user = await User.get(id_)
-    except bson.errors.InvalidId:
-        logger.error("received invalid user_id")
-        raise HTTPException(HTTP_400_BAD_REQUEST, "Invalid user_id.")
+        user = await User.get(user_id)
     except Exception as ex:
         logger.error(f"error fetching user: {ex}")
         raise
@@ -75,7 +70,7 @@ async def get_user_from_database(user_id: str, missing_user_error: bool = True) 
     return user
 
 
-async def get_user(user_id: str) -> UserBase:
+async def get_user(user_id: PydanticObjectId) -> UserBase:
     """Fetches and returns a user from the database, if user exists, given the user ID."""
 
     # fetch user and narrow its type to prevent type errors
@@ -92,7 +87,7 @@ async def get_user(user_id: str) -> UserBase:
     return user
 
 
-async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
+async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) -> None:
     """Updates a user in the database, if the user exists, given the user ID."""
 
     # fetch user and narrow its type to prevent type errors
@@ -109,7 +104,7 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
         raise
 
 
-async def delete_user(user_id: str) -> None:
+async def delete_user(user_id: PydanticObjectId) -> None:
     """Deletes a user from the database, if the user exists, given the user ID."""
 
     # fetch user and narrow its type to prevent type errors
