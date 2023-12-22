@@ -1,7 +1,10 @@
 import datetime as dt
+import re
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, EmailStr, Field, SecretStr
+from pydantic import BaseModel, EmailStr, Field, SecretStr, validator
+
+from src.config.constants.app import PASSWORD_REGEX
 
 
 class UserInput(BaseModel):
@@ -9,17 +12,18 @@ class UserInput(BaseModel):
 
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
-    password: SecretStr = Field(min_length=8, max_length=64)
+    password: SecretStr = Field(min_length=8)
 
-    # todo: add more stringent password checks
-    # @validator("password")
-    # def check_password_length(cls, input: SecretStr) -> SecretStr:
-    #     """Checks the entered password's validity."""
+    @validator("password")
+    def check_password_length(cls, value: SecretStr) -> SecretStr:
+        """Checks the entered password's validity."""
 
-    #     if not 65 > len(input) >= 8:
-    #         raise ValueError("The password length should be between 8 and 64 characters.")
+        password_meets_requirements = bool(re.match(PASSWORD_REGEX, value.get_secret_value()))
 
-    #     return input
+        if not password_meets_requirements:
+            raise ValueError()
+
+        return value
 
 
 class UserUpdateInput(BaseModel):
