@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from src.schemas.http.common import COMMON_RESPONSES
+from src.schemas.web_responses.common import COMMON_RESPONSES
 
 
 CREATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {

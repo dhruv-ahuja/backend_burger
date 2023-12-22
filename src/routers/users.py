@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Path
 from loguru import logger
 
-from src.schemas.http import users as http
+from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserInput, UserUpdateInput
 from src.services import users as service
@@ -10,7 +10,7 @@ from src.services import users as service
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/", responses=http.CREATE_USER_RESPONSES)
+@router.post("/", responses=resp.CREATE_USER_RESPONSES)
 async def create_user(user_input: UserInput):
     """Creates a user in the database and returns the user's ID."""
 
@@ -22,7 +22,7 @@ async def create_user(user_input: UserInput):
     return AppResponse(BaseResponse(data=data))
 
 
-@router.get("/", responses=http.GET_USERS_RESPONSES)
+@router.get("/", responses=resp.GET_USERS_RESPONSES)
 async def get_all_users():
     """Gets a list of all users from the database."""
 
@@ -32,7 +32,7 @@ async def get_all_users():
     return AppResponse(BaseResponse(data=users, key="users"), use_dict=True)
 
 
-@router.get("/{user_id}", responses=http.GET_USER_RESPONSES)
+@router.get("/{user_id}", responses=resp.GET_USER_RESPONSES)
 async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_length=24)):
     """Fetches a single user from the databse, if the user exists."""
 
@@ -42,7 +42,7 @@ async def get_user(user_id: str = Path(..., title="user_id", min_length=24, max_
     return AppResponse(BaseResponse(data=user))
 
 
-@router.put("/{user_id}", status_code=204, responses=http.UPDATE_USER_RESPONSES)
+@router.put("/{user_id}", status_code=204, responses=resp.UPDATE_USER_RESPONSES)
 async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_length=24, max_length=24)) -> None:
     """Updates a single user in the database, if the user exists."""
 
@@ -50,7 +50,7 @@ async def update_user(user_input: UserUpdateInput, user_id: str = Path(..., min_
     await service.update_user(user_id, user_input)
 
 
-@router.delete("/{user_id}", status_code=204, responses=http.DELETE_USER_RESPONSES)
+@router.delete("/{user_id}", status_code=204, responses=resp.DELETE_USER_RESPONSES)
 async def delete_user(user_id: str = Path(..., min_length=24, max_length=24)) -> None:
     """Deletes a single user from the database, if the user exists."""
 
