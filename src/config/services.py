@@ -52,6 +52,8 @@ class Settings(BaseSettings):
 
     db_url: SecretStr
 
+    jwt_secret_key: SecretStr
+
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
     """Calls the Settings class' instance, which parses and prepares env vars for use throughout the application.\n
@@ -232,8 +234,6 @@ async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     path = pathlib.Path(logs.LOGS_DIRECTORY)
     initialize_logger(logs.LOGGER_MESSAGE_FORMAT, path, logs.LOGGER_FILENAME_FORMAT)
 
-    settings = generate_settings_config()
-
     aws_session = initialize_aws_session(
         settings.aws_access_key.get_secret_value(),
         settings.aws_access_secret.get_secret_value(),
@@ -255,3 +255,6 @@ async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     yield
 
     scheduler.shutdown()
+
+
+settings = generate_settings_config()
