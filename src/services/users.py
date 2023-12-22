@@ -55,8 +55,8 @@ async def get_users() -> list[UserBase]:
 
 
 async def get_user_from_database(user_id: PydanticObjectId | None, missing_user_error: bool = True) -> User | None:
-    """Fetches a user from the database, raising a 400 error if the given `user_id` is invalid. Raises a 404 error if
-    the user does not exist and `missing_user_error` is `True`."""
+    """Fetches a user from the database. Raises a 404 error if the user does not exist and `missing_user_error`
+    is `True`."""
 
     try:
         user = await User.get(user_id)
