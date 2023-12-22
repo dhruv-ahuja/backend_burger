@@ -1,3 +1,4 @@
+from typing import cast
 from beanie import PydanticObjectId
 import bson.errors
 from fastapi import HTTPException
@@ -54,8 +55,9 @@ async def get_users() -> list[UserBase]:
     return users
 
 
-async def get_user_from_database(user_id: str) -> User:
-    """Fetches a user from the database, raising an error if the given user_id is invalid or the user does not exist."""
+async def get_user_from_database(user_id: str, missing_user_error: bool = True) -> User | None:
+    """Fetches a user from the database, raising a 400 error if the given `user_id` is invalid. Raises a 404 error if
+    the user does not exist and `missing_user_error` is `True`."""
 
     try:
         id_ = PydanticObjectId(user_id)
@@ -67,7 +69,7 @@ async def get_user_from_database(user_id: str) -> User:
         logger.error(f"error fetching user: {ex}")
         raise
 
-    if user is None:
+    if user is None and missing_user_error:
         raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
 
     return user
@@ -76,7 +78,9 @@ async def get_user_from_database(user_id: str) -> User:
 async def get_user(user_id: str) -> UserBase:
     """Fetches and returns a user from the database, if user exists, given the user ID."""
 
+    # fetch user and narrow its type to prevent type errors
     user_record = await get_user_from_database(user_id)
+    user_record = cast(User, user_record)
 
     user = UserBase(
         id=user_record.id,
@@ -91,7 +95,9 @@ async def get_user(user_id: str) -> UserBase:
 async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
     """Updates a user in the database, if the user exists, given the user ID."""
 
+    # fetch user and narrow its type to prevent type errors
     user = await get_user_from_database(user_id)
+    user = cast(User, user)
 
     user.name = user_input.name
     user.email = user_input.email
@@ -106,7 +112,9 @@ async def update_user(user_id: str, user_input: UserUpdateInput) -> None:
 async def delete_user(user_id: str) -> None:
     """Deletes a user from the database, if the user exists, given the user ID."""
 
+    # fetch user and narrow its type to prevent type errors
     user = await get_user_from_database(user_id)
+    user = cast(User, user)
 
     try:
         await user.delete()
