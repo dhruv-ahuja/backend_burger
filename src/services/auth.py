@@ -1,12 +1,16 @@
+import datetime as dt
+
 from beanie import PydanticObjectId
 import bson.errors
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
+from loguru import logger
 from starlette import status
-from src.models.users import User
 
-from src.utils.auth_utils import compare_values
+from src.models.auth import BlacklistedTokens
+from src.models.users import User
 from src.services import users as users_service
+from src.utils.auth_utils import compare_values
 
 
 async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
@@ -30,3 +34,16 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
         raise invalid_credentials_error
 
     return user
+
+
+async def blacklist_token(user: User, token: str, expiration_time: dt.datetime) -> None:
+    """Adds a token to the BlacklistTokens records, marking it as invalid for the application."""
+
+    blacklist_record = BlacklistedTokens(user=user, token=token, expiration_time=expiration_time)  # type: ignore
+
+    try:
+        await blacklist_record.insert()  # type: ignore
+    except Exception as ex:
+        print(f"error adding token to blacklist: {ex}")
+        logger.error(f"error adding token to blacklist: {ex}")
+        raise

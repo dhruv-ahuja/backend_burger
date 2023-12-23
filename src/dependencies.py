@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from starlette import status
 
-from src.utils.auth_utils import parse_access_token
+from src.utils import auth_utils
 from src.models.users import User
 from src.services import users as users_service
 
@@ -20,7 +20,7 @@ async def check_access_token(access_token: str = Depends(oauth2_scheme)) -> dict
     Raises a 403 error if any of the checks fails."""
 
     try:
-        token_data = parse_access_token(access_token)
+        token_data = auth_utils.parse_access_token(access_token)
     except JWTError:
         return None
 
