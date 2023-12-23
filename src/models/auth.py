@@ -5,8 +5,8 @@ from beanie import Document, Link
 from src.models.users import User
 
 
-class BlacklistedTokens(Document):
-    """BlacklistedTokens contains information regarding tokens blacklisted by the application."""
+class BlacklistedToken(Document):
+    """BlacklistedToken holds information regarding a token blacklisted by the application."""
 
     user: Link[User]
     token: str

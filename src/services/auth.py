@@ -7,7 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from starlette import status
 
-from src.models.auth import BlacklistedTokens
+from src.models.auth import BlacklistedToken
 from src.models.users import User
 from src.services import users as users_service
 from src.utils.auth_utils import compare_values
@@ -39,7 +39,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
 async def blacklist_token(user: User, token: str, expiration_time: dt.datetime) -> None:
     """Adds a token to the BlacklistTokens records, marking it as invalid for the application."""
 
-    blacklist_record = BlacklistedTokens(user=user, token=token, expiration_time=expiration_time)  # type: ignore
+    blacklist_record = BlacklistedToken(user=user, token=token, expiration_time=expiration_time)  # type: ignore
 
     try:
         await blacklist_record.insert()  # type: ignore
