@@ -5,8 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from starlette import status
 from src.models.users import User
 
-from src.services import users as users_service
 from src.utils.auth_utils import compare_values
+from src.services import users as users_service
 
 
 async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:

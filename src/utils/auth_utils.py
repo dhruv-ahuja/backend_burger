@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import Any
 
-from jose import jwt
+from jose import jwt, JWTError
 from passlib.hash import argon2
 
 from src.config.services import settings
@@ -35,3 +35,16 @@ def create_access_token(sub: str | None = None, expiry_time: dt.timedelta | None
     access_token = jwt.encode(token_data, jwt_secret_key)
 
     return access_token
+
+
+def parse_access_token(access_token: str) -> dict[str, Any]:
+    """Parses the given access token, raising an error if its invalid, and returns its data if valid."""
+
+    jwt_secret_key = settings.jwt_secret_key.get_secret_value()
+
+    try:
+        data = jwt.decode(access_token, jwt_secret_key)
+    except JWTError:
+        raise
+
+    return data
