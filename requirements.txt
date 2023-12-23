@@ -16,7 +16,9 @@ click-didyoumean==0.3.0
 click-plugins==1.1.1
 click-repl==0.3.0
 coverage==7.3.3
+cryptography==41.0.7
 dnspython==2.4.2
+ecdsa==0.18.0
 email-validator==2.1.0.post1
 fastapi==0.104.1
 gunicorn==21.2.0
@@ -44,6 +46,7 @@ packaging==23.2
 passlib==1.7.4
 pluggy==1.3.0
 prompt-toolkit==3.0.41
+pyasn1==0.5.1
 pycparser==2.21
 pycurl==7.45.2
 pydantic==2.5.0
@@ -56,8 +59,11 @@ pytest-cov==4.1.0
 pytest-mock==3.12.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
+python-jose==3.3.0
+python-multipart==0.0.6
 pytz==2023.3.post1
 PyYAML==6.0.1
+rsa==4.9
 ruff==0.1.5
 s3transfer==0.7.0
 six==1.16.0
