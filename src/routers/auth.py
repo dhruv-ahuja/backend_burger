@@ -31,8 +31,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.get("/logout", status_code=status.HTTP_204_NO_CONTENT, responses=resp.LOGOUT_RESPONSES)
 async def logout(
-    token_data: dict[str, Any] = Depends(deps.check_access_token), user: User = Depends(deps.get_current_user)
+    access_token: str = Depends(deps.oauth2_scheme),
+    token_data: dict[str, Any] = Depends(deps.check_access_token),
+    user: User = Depends(deps.get_current_user),
 ):
     """Logs the current user out of the application."""
 
-    await service.blacklist_token(user, token_data["sub"], token_data["exp"])
+    await service.blacklist_token(user, access_token, token_data["exp"])

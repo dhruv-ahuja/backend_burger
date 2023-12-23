@@ -44,6 +44,17 @@ async def blacklist_token(user: User, token: str, expiration_time: dt.datetime) 
     try:
         await blacklist_record.insert()  # type: ignore
     except Exception as ex:
-        print(f"error adding token to blacklist: {ex}")
         logger.error(f"error adding token to blacklist: {ex}")
         raise
+
+
+async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
+    """Fetches a blacklisted token from the database, given the token value."""
+
+    try:
+        blacklisted_token = await BlacklistedToken.find_one(BlacklistedToken.token == token)
+    except Exception as ex:
+        logger.error(f"error fetching blacklisted token: {ex}")
+        raise
+
+    return blacklisted_token
