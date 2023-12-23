@@ -10,7 +10,7 @@ LOGIN_RESPONSES: Dict[int | str, Dict[str, Any]] = {
             "application/json": {
                 "example": {
                     "data": {
-                        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDMyMzI2NTEsInN1YiI6IjY1ODUzMTI5NzljYjlmNTRlZjU5NjI0ZSJ9.qYSSRKVV4Tqwebri9pIv2HxB096eWV31l3-I-uTizxc",
+                        "access_token": "access_token_here",
                         "type": "Bearer",
                     },
                     "error": None,
