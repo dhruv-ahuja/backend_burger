@@ -5,6 +5,7 @@ from pymongo import IndexModel
 from src.schemas.users import UserBase
 
 
+# TODO: add user status and login attempts columns
 class User(UserBase, Document):
     """User represents a User of the application."""
 

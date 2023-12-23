@@ -1,6 +1,7 @@
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Path
+from fastapi import APIRouter
 from loguru import logger
+from starlette import status
 
 from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
@@ -43,7 +44,7 @@ async def get_user(user_id: PydanticObjectId):
     return AppResponse(BaseResponse(data=user))
 
 
-@router.put("/{user_id}", status_code=204, responses=resp.UPDATE_USER_RESPONSES)
+@router.put("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=resp.UPDATE_USER_RESPONSES)
 async def update_user(user_input: UserUpdateInput, user_id: PydanticObjectId) -> None:
     """Updates a single user in the database, if the user exists."""
 
@@ -51,7 +52,7 @@ async def update_user(user_input: UserUpdateInput, user_id: PydanticObjectId) ->
     await service.update_user(user_id, user_input)
 
 
-@router.delete("/{user_id}", status_code=204, responses=resp.DELETE_USER_RESPONSES)
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=resp.DELETE_USER_RESPONSES)
 async def delete_user(user_id: PydanticObjectId) -> None:
     """Deletes a single user from the database, if the user exists."""
 
