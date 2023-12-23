@@ -9,7 +9,7 @@ from starlette import status
 
 from src.utils import auth_utils
 from src.models.users import User
-from src.services import users as users_service
+from src.services import users as users_service, auth as auth_service
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -17,11 +17,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 async def check_access_token(access_token: str = Depends(oauth2_scheme)) -> dict[str, Any] | None:
     """Checks whether the access token was signed by this server and whether its still valid.
-    Raises a 403 error if any of the checks fails."""
+    Returns `None` if the token is invalid, else the token data dictionary."""
 
     try:
         token_data = auth_utils.parse_access_token(access_token)
     except JWTError:
+        return None
+
+    blacklisted_token = await auth_service.get_blacklisted_token(access_token)
+    if blacklisted_token is not None:
         return None
 
     return token_data
