@@ -1,8 +1,9 @@
+from contextlib import asynccontextmanager
+import datetime as dt
+from enum import Enum
 import pathlib
 import sys
 import typing as t
-from contextlib import asynccontextmanager
-from enum import Enum
 
 import beanie
 import boto3
@@ -10,6 +11,7 @@ import boto3.exceptions
 import botocore
 import botocore.errorfactory
 from apscheduler.job import Job
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from boto3.resources.base import ServiceResource
@@ -25,10 +27,13 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from watchtower import CloudWatchLogHandler
 
-from src.models import document_models
-
-import src.config.utils as utils
+from src.config import utils
 from src.config.constants import app, logs
+from src.models import document_models
+from src.utils import jobs
+
+
+# TODO: break this module into submodules
 
 
 class AwsService(str, Enum):
@@ -243,9 +248,15 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
     await connect_to_mongodb(settings.db_url.get_secret_value(), document_models)
 
+    async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()
     schedule_logs_upload_job(s3_bucket, scheduler)
+
+    delete_older_than = dt.datetime.now() - dt.timedelta(days=1)
+    jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
+
     scheduler.start()
+    async_scheduler.start()
 
     # inject services into global app state
     app_.state.queue = queue
@@ -255,6 +266,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     yield
 
     scheduler.shutdown()
+    async_scheduler.shutdown()
 
 
 settings = generate_settings_config()

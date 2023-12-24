@@ -58,3 +58,16 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
         raise
 
     return blacklisted_token
+
+
+async def delete_expired_blacklisted_tokens(delete_older_than: dt.datetime) -> None:
+    """Deletes expired blacklisted tokens older than the given date range, from the database.
+    Compares tokens' expiration times with the given date range."""
+
+    logger.info(f"deleting expired blacklisted tokens older than {delete_older_than}")
+
+    try:
+        await BlacklistedToken.find_many(BlacklistedToken.expiration_time < delete_older_than).delete()
+    except Exception as ex:
+        logger.error(f"error deleting expired tokens: {ex}")
+        raise

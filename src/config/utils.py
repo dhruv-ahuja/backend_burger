@@ -3,7 +3,7 @@ import os
 from typing import Any, Callable
 
 from apscheduler.job import Job
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.base import BaseScheduler
 from apscheduler.triggers.base import BaseTrigger
 from fastapi.exceptions import ValidationException
 from loguru import logger
@@ -89,7 +89,7 @@ def gather_and_upload_s3_logs(
 
 
 def setup_job(
-    scheduler: BackgroundScheduler,
+    scheduler: BaseScheduler,
     function: Callable | str,
     job_id: str | None = None,
     trigger: BaseTrigger | None = None,
