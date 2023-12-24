@@ -5,7 +5,6 @@ from typing import Any, Callable
 from apscheduler.job import Job
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.base import BaseTrigger
-from apscheduler.util import _Undefined
 from fastapi.exceptions import ValidationException
 from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
@@ -91,11 +90,11 @@ def gather_and_upload_s3_logs(
 
 def setup_job(
     scheduler: BackgroundScheduler,
-    function: Callable,
+    function: Callable | str,
     job_id: str | None = None,
     trigger: BaseTrigger | None = None,
     misfire_grace_time: int | None = 60,
-    max_instances: int | _Undefined = _Undefined(),
+    max_instances: int = 1,
     *args,
     **kwargs,
 ) -> Job:
