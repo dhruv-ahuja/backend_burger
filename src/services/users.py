@@ -18,7 +18,7 @@ async def create_user(user_input: UserInput) -> PydanticObjectId | None:
     user = User(name=user_input.name, email=user_input.email, password=SecretStr(hashed_password))
 
     try:
-        user = await user.insert()
+        user = await user.insert()  # type: ignore
     except DuplicateKeyError:
         logger.error("error creating user: duplicate email used")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
@@ -98,7 +98,7 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
     user.email = user_input.email
 
     try:
-        await user.replace()
+        await user.replace()  # type: ignore
     except DuplicateKeyError:
         logger.error("error updating user: duplicate email used")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
@@ -115,7 +115,7 @@ async def delete_user(user_id: PydanticObjectId) -> None:
     user = cast(User, user)
 
     try:
-        await user.delete()
+        await user.delete()  # type: ignore
     except Exception as ex:
         logger.error(f"error deleting user: {ex}")
         raise
