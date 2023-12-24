@@ -16,7 +16,7 @@ from pytest_mock.plugin import MockType
 
 from src.config.constants.app import PROJECT_NAME, S3_FOLDER_NAME
 from src.config.constants.logs import LOGS_DATETIME_FORMAT
-from src.config.utils import gather_logs, parse_validation_error, upload_logs, setup_job
+from src.utils.config import gather_logs, parse_validation_error, upload_logs, setup_job
 
 
 @pytest.fixture

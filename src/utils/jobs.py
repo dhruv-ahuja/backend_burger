@@ -7,7 +7,7 @@ from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
 
-from src.config import utils
+from src.utils import config
 
 
 def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> Job:
@@ -16,7 +16,9 @@ def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> 
     job_id = "upload_s3_logs"
     trigger = CronTrigger(day_of_week="sun", hour=00, minute=5)
 
-    job = utils.setup_job(scheduler, lambda: utils.gather_and_upload_s3_logs(bucket), job_id, trigger, max_instances=1)
+    job = config.setup_job(
+        scheduler, lambda: config.gather_and_upload_s3_logs(bucket), job_id, trigger, max_instances=1
+    )
     logger.info(f"scheduled '{job_id}' job to run weekly")
 
     return job
@@ -28,7 +30,7 @@ def schedule_tokens_deletion(delete_older_than: dt.datetime, scheduler: AsyncIOS
     job_id = "delete_expired_blacklisted_tokens"
     trigger = CronTrigger(hour=00, minute=5)
 
-    job = utils.setup_job(
+    job = config.setup_job(
         scheduler,
         "src.services.auth:delete_expired_blacklisted_tokens",
         job_id,

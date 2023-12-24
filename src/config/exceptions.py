@@ -7,7 +7,7 @@ from starlette import status
 from src.schemas.responses import AppResponse, BaseError, BaseResponse, AppErrorResponse
 from src.config.constants.app import INTERNAL_SCHEMA_MODELS
 from src.config.constants.exceptions import ERROR_MAPPING
-from src.config.utils import parse_validation_error
+from src.utils.config import parse_validation_error
 
 
 ERROR_RESPONSE = AppResponse(

@@ -186,8 +186,8 @@ def initialize_aws_services(aws_session: boto3.Session) -> t.Tuple[Queue, Bucket
     """Connects to all AWS services and returns AWS re-usable instances. Gathers all AWS services' initialization
     function calls in one place."""
 
-    cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
-    initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
+    # cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
+    # initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
 
     sqs_client = get_aws_service(AwsService.SQS, aws_session)
     queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
