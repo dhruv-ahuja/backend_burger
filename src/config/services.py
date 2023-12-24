@@ -10,10 +10,8 @@ import boto3
 import boto3.exceptions
 import botocore
 import botocore.errorfactory
-from apscheduler.job import Job
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
 from boto3.resources.base import ServiceResource
 from fastapi import FastAPI
 from loguru import logger
@@ -27,7 +25,6 @@ from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from watchtower import CloudWatchLogHandler
 
-from src.config import utils
 from src.config.constants import app, logs
 from src.models import document_models
 from src.utils import jobs
@@ -217,18 +214,6 @@ async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Do
     logger.info("successfully connected to database")
 
 
-def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> Job:
-    """Schedules the S3 log upload job to run once a week."""
-
-    job_id = "upload_s3_logs"
-    trigger = CronTrigger(day_of_week="sun", hour=00, minute=5)
-
-    job = utils.setup_job(scheduler, lambda: utils.gather_and_upload_s3_logs(bucket), job_id, trigger, max_instances=1)
-    logger.info(f"scheduled '{job_id}' job to run weekly")
-
-    return job
-
-
 @asynccontextmanager
 async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to and initializes required services on FastAPI app startup. These services live throughout
@@ -250,7 +235,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
     async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()
-    schedule_logs_upload_job(s3_bucket, scheduler)
+    jobs.schedule_logs_upload_job(s3_bucket, scheduler)
 
     delete_older_than = dt.datetime.now() - dt.timedelta(days=1)
     jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
