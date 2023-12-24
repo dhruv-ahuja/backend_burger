@@ -5,6 +5,7 @@ from typing import Any, Callable
 from apscheduler.job import Job
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.base import BaseTrigger
+from apscheduler.util import _Undefined
 from fastapi.exceptions import ValidationException
 from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
@@ -94,11 +95,14 @@ def setup_job(
     job_id: str | None = None,
     trigger: BaseTrigger | None = None,
     misfire_grace_time: int | None = 60,
+    max_instances: int | _Undefined = _Undefined(),
     *args,
     **kwargs,
 ) -> Job:
     """Creates a background job with the given parameters and registers it with the scheduler."""
 
-    job = scheduler.add_job(function, trigger, args, kwargs, job_id, misfire_grace_time=misfire_grace_time)
+    job = scheduler.add_job(
+        function, trigger, args, kwargs, job_id, misfire_grace_time=misfire_grace_time, max_instances=max_instances
+    )
 
     return job

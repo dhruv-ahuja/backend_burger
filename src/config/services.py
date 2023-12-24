@@ -218,14 +218,14 @@ def schedule_logs_upload_job(bucket: Bucket, scheduler: BackgroundScheduler) -> 
     job_id = "upload_s3_logs"
     trigger = CronTrigger(day_of_week="sun", hour=00, minute=5)
 
-    job = utils.setup_job(scheduler, lambda: utils.gather_and_upload_s3_logs(bucket), job_id, trigger)
+    job = utils.setup_job(scheduler, lambda: utils.gather_and_upload_s3_logs(bucket), job_id, trigger, max_instances=1)
     logger.info(f"scheduled '{job_id}' job to run weekly")
 
     return job
 
 
 @asynccontextmanager
-async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
+async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to and initializes required services on FastAPI app startup. These services live throughout
     the app's execution lifespan.\n
     Injects re-usable services into the FastAPI application state, making them available to all route handler
@@ -248,9 +248,9 @@ async def setup_services(app: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     scheduler.start()
 
     # inject services into global app state
-    app.state.queue = queue
-    app.state.bucket = s3_bucket
-    app.state.scheduler = scheduler
+    app_.state.queue = queue
+    app_.state.bucket = s3_bucket
+    app_.state.scheduler = scheduler
 
     yield
 
