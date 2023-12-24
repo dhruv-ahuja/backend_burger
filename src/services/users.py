@@ -99,6 +99,9 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
 
     try:
         await user.replace()
+    except DuplicateKeyError:
+        logger.error("error updating user: duplicate email used")
+        raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
     except Exception as ex:
         logger.error(f"error updating user details: {ex}")
         raise

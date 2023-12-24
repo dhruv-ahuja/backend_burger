@@ -122,6 +122,20 @@ GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
 
 UPDATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     **COMMON_RESPONSES,
+    400: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "error": {
+                        "type": "invalid_input",
+                        "message": "Email associated with another account.",
+                        "fields": None,
+                    },
+                }
+            }
+        },
+        "data": None,
+    },
     404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},
     422: {
         "content": {
