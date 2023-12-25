@@ -2,15 +2,15 @@
 # using a multi-stage build to save space
 FROM python:3.11-slim AS builder-image
 
-# create a venv to make copying packages folder easier b/w the different stages
-# declaring the path to avoid path issues w/ packages
+# create a venv to make copying packages folder easier b/w the different stages declaring the path to avoid path issues
+# w/ packages
 RUN python3.11 -m venv /home/myuser/venv 
 ENV PATH="/home/myuser/venv/bin:$PATH"
 
+# install extra libraries needed for pycurl
 RUN apt-get update && apt-get install -y  curl libcurl4-openssl-dev build-essential libssl-dev
 
-# copying and installing requirements first will avoid a re-install of all dependencies
-# when re-building the image
+# copying and installing requirements first will avoid a re-install of all dependencies when re-building the image
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir wheel 
 RUN pip3 install --no-cache-dir -r requirements.txt 
@@ -19,8 +19,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # FROM ubuntu:22.04 AS runner-image 
 FROM python:3.11-slim AS runner-image
 
-# creating a separate user to run the docker commands, helps with security as root 
-# access is denied to this user
+# creating a separate user to run the docker commands, helps with security as root access is denied to this user
 RUN useradd --create-home myuser
 
 # copy over the virtualenv created in the previous layer to the current user's dir
@@ -34,12 +33,18 @@ COPY . .
 
 EXPOSE 8000 
 
-# using this ensures that all messages are printed out on the terminal
-# ENV PYTHONUNBUFFERED=1
+# improves logging behaviour for containers
+ENV PYTHONUNBUFFERED=1
 
 # activate the virtualenv
 ENV VIRTUAL_ENV=/home/myuser/venv
 ENV PATH="/home/myuser/venv/bin:$PATH"
 
+RUN mkdir -p /home/myuser/log
+
+ENV NEW_RELIC_LICENSE_KEY=eu01xx781dc32a3159ae8b464130a139FFFFNRAL
+ENV NEW_RELIC_APP_NAME=backend_burger_docker
+ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
+
 # using /dev/shm as the worker temp dir will help prevent random locks and freezes used for gunicorn heartbeat
-CMD [ "gunicorn", "-b", "0.0.0.0:8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app" ]
+CMD gunicorn -b 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --worker-tmp-dir /dev/shm src.main:app

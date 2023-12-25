@@ -41,6 +41,7 @@ mypy-boto3-logs==1.28.83
 mypy-boto3-rds==1.28.84
 mypy-boto3-s3==1.28.55
 mypy-boto3-sqs==1.28.82
+newrelic==9.3.0
 orjson==3.9.10
 packaging==23.2
 passlib==1.7.4

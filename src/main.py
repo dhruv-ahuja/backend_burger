@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+import newrelic.agent
 from pydantic import ValidationError
 from starlette import status
 
@@ -14,6 +15,9 @@ from src.config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
 from src.config.services import setup_services
 from src.routers import users, auth
 from src.schemas.responses import AppResponse, BaseResponse
+
+
+newrelic.agent.initialize()
 
 
 app = FastAPI(lifespan=setup_services)
