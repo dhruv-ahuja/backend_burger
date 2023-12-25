@@ -42,7 +42,6 @@ ENV PATH="/home/myuser/venv/bin:$PATH"
 
 RUN mkdir -p /home/myuser/log
 
-ENV NEW_RELIC_LICENSE_KEY=eu01xx781dc32a3159ae8b464130a139FFFFNRAL
 ENV NEW_RELIC_APP_NAME=backend_burger_docker
 ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
 
