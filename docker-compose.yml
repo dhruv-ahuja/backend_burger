@@ -1,0 +1,31 @@
+version: "3"
+
+services:
+  backend_burger: 
+    image: backend_burger:${VERSION}
+    container_name: backend_burger
+    build:
+      context: .
+    environment:
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION_NAME=${AWS_REGION_NAME}
+      - SQS_QUEUE_NAME=${SQS_QUEUE_NAME}
+      - S3_BUCKET_URL=${S3_BUCKET_URL}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_LOGS_FOLDER=${S3_LOGS_FOLDER}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME}
+      - NEW_RELIC_APP_NAME=backend_burger_docker
+      - ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+    - backend_burger_network
+  
+networks:
+  backend_burger_network:
+    name: backend_burger_network

@@ -31,8 +31,6 @@ RUN mkdir /home/myuser/webapp
 WORKDIR /home/myuser/webapp
 COPY . . 
 
-EXPOSE 8000 
-
 # improves logging behaviour for containers
 ENV PYTHONUNBUFFERED=1
 
@@ -41,9 +39,6 @@ ENV VIRTUAL_ENV=/home/myuser/venv
 ENV PATH="/home/myuser/venv/bin:$PATH"
 
 RUN mkdir -p /home/myuser/log
-
-ENV NEW_RELIC_APP_NAME=backend_burger_docker
-ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
 
 # using /dev/shm as the worker temp dir will help prevent random locks and freezes used for gunicorn heartbeat
 CMD gunicorn -b 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker --worker-tmp-dir /dev/shm src.main:app
