@@ -17,10 +17,10 @@ from src.routers import users, auth
 from src.schemas.responses import AppResponse, BaseResponse
 
 
-newrelic.agent.initialize()
+newrelic.agent.initialize("./newrelic.ini")
 
 
-app = FastAPI(lifespan=setup_services)
+app = FastAPI(lifespan=setup_services, redirect_slashes=False)
 
 app.include_router(users.router)
 app.include_router(auth.router)
