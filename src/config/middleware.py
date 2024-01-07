@@ -1,5 +1,8 @@
 import uuid
 import asyncio
+import sys
+import os
+import inspect
 
 from fastapi import Request, Response
 from loguru import logger
@@ -20,7 +23,18 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
         except Exception as exc:
-            logger.error(f"error when processing request: {exc}")
+            exc_type, exc_object, exc_traceback = sys.exc_info()
+
+            # Use inspect to get the correct filename and line number
+            frame = inspect.trace()[-1]
+            # extract relative filename (/src/...)
+            exc_filename = frame[0].f_code.co_filename
+            exc_filename = os.path.relpath(exc_filename, start=os.getcwd())
+            exc_linenumber = frame[0].f_lineno
+
+            logger.error(
+                f"exception type {exc_type}, object: {exc_object} at file {exc_filename}, line no. {exc_linenumber} when processing request: {exc}"
+            )
             return ERROR_RESPONSE
 
         return response
