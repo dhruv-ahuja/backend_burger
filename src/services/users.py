@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from src.models.users import User
-from src.schemas.users import UserBase, UserInput, UserUpdateInput
+from src.schemas.users import Role, UserBase, UserInput, UserUpdateInput
 from src.utils import auth_utils
 
 
@@ -15,7 +15,7 @@ async def create_user(user_input: UserInput) -> PydanticObjectId | None:
     """Creates a user in the database, and returns the newly created user's ID."""
 
     hashed_password = auth_utils.hash_value(user_input.password.get_secret_value())
-    user = User(name=user_input.name, email=user_input.email, password=SecretStr(hashed_password))
+    user = User(name=user_input.name, email=user_input.email, password=SecretStr(hashed_password), role=Role.user)
 
     try:
         user = await user.insert()  # type: ignore
@@ -46,6 +46,7 @@ async def get_users() -> list[UserBase]:
             id=user_record.id,
             name=user_record.name,
             email=user_record.email,
+            role=user_record.role,
             date_created=user_record.date_created,
             date_updated=user_record.date_updated,
         )
@@ -81,6 +82,7 @@ async def get_user(user_id: PydanticObjectId) -> UserBase:
         id=user_record.id,
         name=user_record.name,
         email=user_record.email,
+        role=user_record.role,
         date_created=user_record.date_created,
         date_updated=user_record.date_updated,
     )

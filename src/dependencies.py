@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from starlette import status
+from src.schemas.users import Role
 
 from src.utils import auth_utils
 from src.models.users import User
@@ -50,3 +51,12 @@ async def get_current_user(token_data: dict[str, Any] | None = Depends(check_acc
         raise forbidden_error
 
     return user
+
+
+async def check_access_to_user_resource(input_user_id: PydanticObjectId, user: User) -> None:
+    """Checks whether the current user has access to the current `User` resource."""
+
+    forbidden_error = HTTPException(status.HTTP_403_FORBIDDEN)
+
+    if user.role != Role.admin and user.id != input_user_id:
+        raise forbidden_error

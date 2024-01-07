@@ -12,6 +12,7 @@ class Role(str, Enum):
     admin = "admin"
     user = "user"
 
+
 class UserInput(BaseModel):
     """UserInput holds the user's input during the user creation process."""
 
@@ -45,6 +46,6 @@ class UserBase(BaseModel):
     id: PydanticObjectId | None = None
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
-    user_role: Role = Role.user
+    role: Role
     date_created: dt.datetime = Field(default_factory=dt.datetime.now)
     date_updated: dt.datetime = Field(default_factory=dt.datetime.now)
