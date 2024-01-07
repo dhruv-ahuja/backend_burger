@@ -27,7 +27,7 @@ async def create_user(user_input: UserInput):
 
 
 @router.get("/", responses=resp.GET_USERS_RESPONSES)
-async def get_all_users():
+async def get_all_users(_=Depends(deps.check_access_token)):
     """Gets a list of all users from the database."""
 
     logger.info("fetching all users")
@@ -37,7 +37,7 @@ async def get_all_users():
 
 
 @router.get("/{user_id}", responses=resp.GET_USER_RESPONSES)
-async def get_user(user_id: PydanticObjectId):
+async def get_user(user_id: PydanticObjectId, _=Depends(deps.check_access_token)):
     """Fetches a single user from the database, if the user exists."""
 
     logger.info(f"fetching user with id: {user_id}")
