@@ -22,8 +22,8 @@ async def create_user(user_input: UserInput) -> PydanticObjectId | None:
     except DuplicateKeyError:
         logger.error("error creating user: duplicate email used")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
-    except Exception as ex:
-        logger.error(f"error creating user: {ex}; error type: {ex.__class__}")
+    except Exception as exc:
+        logger.error(f"error creating user: {exc}; error type: {exc.__class__}")
         raise
 
     return user.id
@@ -34,8 +34,8 @@ async def get_users() -> list[UserBase]:
 
     try:
         user_records = await User.find_all().to_list()
-    except Exception as ex:
-        logger.error(f"error fetching users: {ex}; error_type: {ex.__class__}")
+    except Exception as exc:
+        logger.error(f"error fetching users: {exc}; error_type: {exc.__class__}")
         raise
 
     users = []
@@ -60,8 +60,8 @@ async def get_user_from_database(user_id: PydanticObjectId | None, missing_user_
 
     try:
         user = await User.get(user_id)
-    except Exception as ex:
-        logger.error(f"error fetching user: {ex}")
+    except Exception as exc:
+        logger.error(f"error fetching user: {exc}")
         raise
 
     if user is None and missing_user_error:
@@ -102,8 +102,8 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
     except DuplicateKeyError:
         logger.error("error updating user: duplicate email used")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
-    except Exception as ex:
-        logger.error(f"error updating user details: {ex}")
+    except Exception as exc:
+        logger.error(f"error updating user details: {exc}")
         raise
 
 
@@ -116,6 +116,6 @@ async def delete_user(user_id: PydanticObjectId) -> None:
 
     try:
         await user.delete()  # type: ignore
-    except Exception as ex:
-        logger.error(f"error deleting user: {ex}")
+    except Exception as exc:
+        logger.error(f"error deleting user: {exc}")
         raise

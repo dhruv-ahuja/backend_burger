@@ -78,8 +78,8 @@ def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> bo
             aws_secret_access_key=key_secret,
             region_name=region_name,
         )
-    except boto3.exceptions.Boto3Error as ex:
-        logger.error(f"error connecting to AWS: {ex}")
+    except boto3.exceptions.Boto3Error as exc:
+        logger.error(f"error connecting to AWS: {exc}")
         raise
 
     return session
@@ -96,8 +96,8 @@ def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResou
                 client = session.client(service.value)
             case _:
                 raise ValueError("Enter a valid aws service.")
-    except boto3.exceptions.Boto3Error as ex:
-        logger.error(f"error accessing {service} AWS service: {ex}")
+    except boto3.exceptions.Boto3Error as exc:
+        logger.error(f"error accessing {service} AWS service: {exc}")
         raise
 
     return client
@@ -160,8 +160,8 @@ def get_sqs_queue(client: ServiceResource | CloudWatchLogsClient, queue_name: st
 
     try:
         queue = client.get_queue_by_name(QueueName=queue_name)
-    except botocore.errorfactory.ClientError as ex:
-        logger.error(f"error getting SQS queue: {ex}")
+    except botocore.errorfactory.ClientError as exc:
+        logger.error(f"error getting SQS queue: {exc}")
         raise
 
     return queue
@@ -175,8 +175,8 @@ def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) 
 
     try:
         s3_bucket = s3.Bucket(bucket_name)
-    except botocore.errorfactory.ClientError as ex:
-        logger.error(f"error getting S3 bucket: {ex}")
+    except botocore.errorfactory.ClientError as exc:
+        logger.error(f"error getting S3 bucket: {exc}")
         raise
 
     return s3_bucket
@@ -207,8 +207,8 @@ async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Do
     try:
         client = AsyncIOMotorClient(db_url)
         await beanie.init_beanie(database=client.backendBurger, document_models=document_models)  # type: ignore
-    except Exception as ex:
-        logger.error(f"error initializing database connection: {ex}")
+    except Exception as exc:
+        logger.error(f"error initializing database connection: {exc}")
         raise
 
     logger.info("successfully connected to database")

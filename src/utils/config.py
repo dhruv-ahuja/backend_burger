@@ -69,8 +69,8 @@ def upload_logs(bucket: Bucket, target_folder: str, logs_paths: list[tuple[str, 
         s3_logs_path = f"{target_folder}/{file_name}"
         try:
             bucket.upload_file(log_path, s3_logs_path)
-        except Exception as ex:
-            logger.error(f"error uploading log '{log_path}' to s3: {ex}")
+        except Exception as exc:
+            logger.error(f"error uploading log '{log_path}' to s3: {exc}")
 
     logger.info("successfully uploaded logs to s3")
 

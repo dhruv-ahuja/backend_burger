@@ -21,7 +21,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
     try:
         user_id = PydanticObjectId(form_data.username)
     except bson.errors.InvalidId:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid user_id")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid username")
 
     user = await users_service.get_user_from_database(user_id, False)
     if user is None:
@@ -43,8 +43,8 @@ async def blacklist_token(user: User, token: str, expiration_time: dt.datetime) 
 
     try:
         await blacklist_record.insert()  # type: ignore
-    except Exception as ex:
-        logger.error(f"error adding token to blacklist: {ex}")
+    except Exception as exc:
+        logger.error(f"error adding token to blacklist: {exc}")
         raise
 
 
@@ -53,8 +53,8 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
 
     try:
         blacklisted_token = await BlacklistedToken.find_one(BlacklistedToken.token == token)
-    except Exception as ex:
-        logger.error(f"error fetching blacklisted token: {ex}")
+    except Exception as exc:
+        logger.error(f"error fetching blacklisted token: {exc}")
         raise
 
     return blacklisted_token
@@ -68,6 +68,6 @@ async def delete_expired_blacklisted_tokens(delete_older_than: dt.datetime) -> N
 
     try:
         await BlacklistedToken.find_many(BlacklistedToken.expiration_time < delete_older_than).delete()
-    except Exception as ex:
-        logger.error(f"error deleting expired tokens: {ex}")
+    except Exception as exc:
+        logger.error(f"error deleting expired tokens: {exc}")
         raise
