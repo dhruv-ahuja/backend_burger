@@ -47,8 +47,8 @@ async def get_users() -> list[UserBase]:
             name=user_record.name,
             email=user_record.email,
             role=user_record.role,
-            date_created=user_record.date_created,
-            date_updated=user_record.date_updated,
+            created_time=user_record.created_time,
+            updated_time=user_record.updated_time,
         )
         users.append(user)
 
@@ -83,8 +83,8 @@ async def get_user(user_id: PydanticObjectId) -> UserBase:
         name=user_record.name,
         email=user_record.email,
         role=user_record.role,
-        date_created=user_record.date_created,
-        date_updated=user_record.date_updated,
+        created_time=user_record.created_time,
+        updated_time=user_record.updated_time,
     )
     return user
 

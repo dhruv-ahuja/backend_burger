@@ -47,5 +47,5 @@ class UserBase(BaseModel):
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     role: Role
-    date_created: dt.datetime = Field(default_factory=dt.datetime.now)
-    date_updated: dt.datetime = Field(default_factory=dt.datetime.now)
+    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
+    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
