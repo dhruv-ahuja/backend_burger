@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Any
+from typing import Any, Tuple
 
 from jose import jwt, JWTError
 from passlib.hash import argon2
@@ -19,7 +19,7 @@ def compare_values(value: str, hashed_value: str) -> bool:
     return argon2.verify(value, hashed_value)
 
 
-def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> str:
+def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> Tuple[str, dt.datetime]:
     """Creates an encoded access or refresh token with the given sub and expiry time."""
 
     token_expires_in = dt.datetime.utcnow() + expiry_time
@@ -31,7 +31,7 @@ def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> st
     jwt_secret_key = settings.jwt_secret_key.get_secret_value()
     bearer_token = jwt.encode(token_data, jwt_secret_key)
 
-    return bearer_token
+    return bearer_token, token_expires_in
 
 
 def parse_access_token(access_token: str) -> dict[str, Any]:

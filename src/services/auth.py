@@ -1,13 +1,14 @@
 import datetime as dt
 
 from beanie import PydanticObjectId
+from beanie.operators import Set
 import bson.errors
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from starlette import status
 
-from src.models.users import User, BlacklistedToken
+from src.models.users import User, BlacklistedToken, UserSession
 from src.services import users as users_service
 from src.utils.auth_utils import compare_values
 
@@ -35,6 +36,26 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
     return user
 
 
+async def save_session_details(user: User, refresh_token: str, expiration_time: dt.datetime) -> None:
+    """Saves users session details, storing the issued refresh token and its expiration time in the database.
+    Re-uses an existing session record or creates a new one."""
+
+    values_to_update = {
+        UserSession.refresh_token: refresh_token,
+        UserSession.expiration_time: expiration_time,
+        UserSession.updated_time: dt.datetime.now(),
+    }
+
+    try:
+        await UserSession.find_one(UserSession.user.id == user.id).upsert(  # type: ignore
+            Set(values_to_update),
+            on_insert=UserSession(user=user, refresh_token=refresh_token, expiration_time=expiration_time),  # type: ignore
+        )
+    except Exception as exc:
+        logger.error(f"error saving user session details: {exc}")
+        raise
+
+
 async def blacklist_access_token(user: User, access_token: str, expiration_time: dt.datetime) -> None:
     """Adds an access token to the BlacklistTokens records, marking it as invalid for the application."""
 
@@ -57,6 +78,22 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
         raise
 
     return blacklisted_token
+
+
+async def invalidate_refresh_token(user: User) -> None:
+    """Removes the user's refresh token details from the database, invalidating it for the application."""
+
+    values_to_update = {
+        UserSession.refresh_token: None,
+        UserSession.expiration_time: None,
+        UserSession.updated_time: dt.datetime.now(),
+    }
+
+    try:
+        await UserSession.find_one(UserSession.user.id == user.id).update(Set(values_to_update))  # type: ignore
+    except Exception as exc:
+        logger.error(f"error invalidating refresh token: {exc}")
+        raise
 
 
 async def delete_expired_blacklisted_tokens(delete_older_than: dt.datetime) -> None:

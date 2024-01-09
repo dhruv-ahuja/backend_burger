@@ -33,3 +33,17 @@ class BlacklistedToken(Document):
         """Defines the settings for the collection."""
 
         name = "blacklisted_tokens"
+
+
+class UserSession(Document):
+    """UserSession holds information regarding user's latest session."""
+
+    user: Annotated[Link[User], Indexed(unique=True)]
+    refresh_token: str
+    expiration_time: dt.datetime
+    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
+
+    class Settings:
+        """Defines the settings for the collection."""
+
+        name = "users_sessions"

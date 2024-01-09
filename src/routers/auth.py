@@ -22,10 +22,14 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Logs the user into the application, checking first whether user credentials."""
 
     logger.info("attempting user login")
-
     user = await service.check_users_credentials(form_data)
-    access_token = auth_utils.create_bearer_token(app.ACCESS_TOKEN_DURATION, str(user.id))
-    refresh_token = auth_utils.create_bearer_token(app.REFRESH_TOKEN_DURATION, str(user.id))
+
+    access_token, _ = auth_utils.create_bearer_token(app.ACCESS_TOKEN_DURATION, str(user.id))
+    refresh_token, refresh_token_expiration_time = auth_utils.create_bearer_token(
+        app.REFRESH_TOKEN_DURATION, str(user.id)
+    )
+
+    await service.save_session_details(user, refresh_token, refresh_token_expiration_time)
 
     response = BaseResponse(data={"access_token": access_token, "refresh_token": refresh_token, "type": "Bearer"})
     return AppResponse(response)
@@ -40,3 +44,4 @@ async def logout(
     """Logs the current user out of the application."""
 
     await service.blacklist_access_token(user, access_token, token_data["exp"])
+    await service.invalidate_refresh_token(user)
