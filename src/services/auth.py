@@ -38,7 +38,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
 async def add_blacklist_token(user: User, token: str, expiration_time: dt.datetime) -> None:
     """Adds a token to the BlacklistTokens records, marking it as invalid for the application."""
 
-    blacklist_record = BlacklistedToken(user=user, token=token, expiration_time=expiration_time)  # type: ignore
+    blacklist_record = BlacklistedToken(user=user, access_token=token, expiration_time=expiration_time)  # type: ignore
 
     try:
         await blacklist_record.insert()  # type: ignore
@@ -51,7 +51,7 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
     """Fetches a blacklisted token from the database, given the token value."""
 
     try:
-        blacklisted_token = await BlacklistedToken.find_one(BlacklistedToken.token == token)
+        blacklisted_token = await BlacklistedToken.find_one(BlacklistedToken.access_token == token)
     except Exception as exc:
         logger.error(f"error fetching blacklisted token: {exc}")
         raise
