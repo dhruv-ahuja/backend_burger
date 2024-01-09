@@ -25,7 +25,8 @@ LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
             "application/json": {
                 "example": {
                     "data": {
-                        "access_token": "access_token_here",
+                        "access_token": "<ACCESS_TOKEN>",
+                        "refresh_token": "<REFRESH_TOKEN>",
                         "type": "Bearer",
                     },
                     "error": None,

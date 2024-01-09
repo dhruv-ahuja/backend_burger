@@ -6,8 +6,8 @@ from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from starlette import status
-from src.schemas.users import Role
 
+from src.schemas.users import Role
 from src.utils import auth_utils
 from src.models.users import User
 from src.services import users as users_service, auth as auth_service

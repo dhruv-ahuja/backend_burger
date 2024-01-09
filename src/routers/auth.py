@@ -6,6 +6,7 @@ from loguru import logger
 from starlette import status
 
 from src import dependencies as deps
+from src.config.constants import app
 from src.models.users import User
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.web_responses import auth as resp
@@ -23,9 +24,10 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     logger.info("attempting user login")
 
     user = await service.check_users_credentials(form_data)
-    access_token = auth_utils.create_access_token(str(user.id))
+    access_token = auth_utils.create_bearer_token(app.ACCESS_TOKEN_DURATION, str(user.id))
+    refresh_token = auth_utils.create_bearer_token(app.REFRESH_TOKEN_DURATION, str(user.id))
 
-    response = BaseResponse(data={"access_token": access_token, "type": "Bearer"})
+    response = BaseResponse(data={"access_token": access_token, "refresh_token": refresh_token, "type": "Bearer"})
     return AppResponse(response)
 
 

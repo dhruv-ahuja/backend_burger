@@ -19,11 +19,8 @@ def compare_values(value: str, hashed_value: str) -> bool:
     return argon2.verify(value, hashed_value)
 
 
-def create_access_token(sub: str | None = None, expiry_time: dt.timedelta | None = None) -> str:
-    """Creates an encoded access token with the given sub and expiry time."""
-
-    if expiry_time is None:
-        expiry_time = dt.timedelta(minutes=60)
+def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> str:
+    """Creates an encoded access or refresh token with the given sub and expiry time."""
 
     token_expires_in = dt.datetime.utcnow() + expiry_time
     token_data: dict[str, Any] = {"exp": token_expires_in}
@@ -32,9 +29,9 @@ def create_access_token(sub: str | None = None, expiry_time: dt.timedelta | None
         token_data["sub"] = sub
 
     jwt_secret_key = settings.jwt_secret_key.get_secret_value()
-    access_token = jwt.encode(token_data, jwt_secret_key)
+    bearer_token = jwt.encode(token_data, jwt_secret_key)
 
-    return access_token
+    return bearer_token
 
 
 def parse_access_token(access_token: str) -> dict[str, Any]:
