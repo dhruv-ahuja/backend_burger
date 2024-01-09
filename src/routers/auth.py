@@ -39,4 +39,4 @@ async def logout(
 ):
     """Logs the current user out of the application."""
 
-    await service.blacklist_token(user, access_token, token_data["exp"])
+    await service.add_blacklist_token(user, access_token, token_data["exp"])
