@@ -16,16 +16,24 @@ from src.services import users as users_service, auth as auth_service
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
+def check_bearer_token(token: str, exception_to_raise: Exception) -> dict[str, Any]:
+    """Checks whether given bearer token is valid or not. Raises the given exception instance if invalid."""
+
+    try:
+        token_data = auth_utils.parse_bearer_token(token)
+    except JWTError:
+        raise exception_to_raise
+
+    return token_data
+
+
 async def check_access_token(access_token: str = Depends(oauth2_scheme)) -> dict[str, Any]:
     """Checks whether the access token was signed by this server and whether its still valid.
-    Returns `None` if the token is invalid, else the token data dictionary."""
+    Raises a 403 error if any of the checks fails."""
 
     forbidden_error = HTTPException(status.HTTP_403_FORBIDDEN)
 
-    try:
-        token_data = auth_utils.parse_access_token(access_token)
-    except JWTError:
-        raise forbidden_error
+    token_data = check_bearer_token(access_token, forbidden_error)
 
     blacklisted_token = await auth_service.get_blacklisted_token(access_token)
     if blacklisted_token is not None:

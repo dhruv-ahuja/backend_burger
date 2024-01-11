@@ -34,13 +34,13 @@ def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> Tu
     return bearer_token, token_expires_in
 
 
-def parse_access_token(access_token: str) -> dict[str, Any]:
-    """Parses the given access token, raising an error if its invalid, and returns its data if valid."""
+def parse_bearer_token(token: str) -> dict[str, Any]:
+    """Parses the given bearer token, raising an error if its invalid, and returns its data if valid."""
 
     jwt_secret_key = settings.jwt_secret_key.get_secret_value()
 
     try:
-        data = jwt.decode(access_token, jwt_secret_key)
+        data = jwt.decode(token, jwt_secret_key)
     except JWTError:
         raise
 
