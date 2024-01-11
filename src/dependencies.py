@@ -1,3 +1,5 @@
+import datetime as dt
+import pytz
 from typing import Any
 
 from beanie import PydanticObjectId
@@ -67,3 +69,28 @@ async def check_access_to_user_resource(input_user_id: PydanticObjectId, user: U
 
     if user.role != Role.admin and user.id != input_user_id:
         raise forbidden_error
+
+
+async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
+    """Checks whether the refresh token was signed by this server and whether its still valid.
+    Raises a 401 error if any of the checks fails."""
+
+    forbidden_error = HTTPException(status.HTTP_401_UNAUTHORIZED)
+
+    token_data = check_bearer_token(refresh_token, forbidden_error)
+    user_id = token_data["sub"]
+    expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
+
+    user_session = await auth_service.get_user_session(user_id, None)
+
+    if user_session is None or user_session.expiration_time is None or user_session.expiration_time is None:
+        raise forbidden_error
+
+    # TODO: save all dates as utc and remove this step
+    session_token_expiration_time = pytz.utc.localize(user_session.expiration_time)
+    session_refresh_token = user_session.refresh_token
+
+    if session_token_expiration_time < expiration_time or session_refresh_token != refresh_token:
+        raise forbidden_error
+
+    return token_data

@@ -1,6 +1,6 @@
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Body, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from starlette import status
@@ -45,3 +45,15 @@ async def logout(
 
     await service.blacklist_access_token(user, access_token, token_data["exp"])
     await service.invalidate_refresh_token(user)
+
+
+@router.post("/token", responses=resp.TOKEN_RESPONSES)
+async def refresh_token(refresh_token: str = Body(..., embed=True)):
+    """Refreshes the user's access token, after checking whether the refresh token is valid and has not yet expired."""
+
+    token_data = await deps.check_refresh_token(refresh_token)
+
+    access_token, _ = auth_utils.create_bearer_token(app.ACCESS_TOKEN_DURATION, token_data["sub"])
+
+    response = BaseResponse(data={"access_token": access_token, "type": "Bearer"})
+    return response

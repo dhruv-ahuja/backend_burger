@@ -54,3 +54,32 @@ LOGIN_RESPONSES.pop(403)
 
 
 LOGOUT_RESPONSES: dict[int | str, dict[str, Any]] = {**COMMON_RESPONSES}
+
+
+TOKEN_RESPONSES: dict[int | str, dict[str, Any]] = {
+    **COMMON_RESPONSES,
+    200: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": {"access_token": "<ACCESS_TOKEN>", "type": "Bearer"},
+                    "error": None,
+                }
+            }
+        }
+    },
+    422: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": None,
+                    "error": {
+                        "type": "validation_error",
+                        "message": "Input failed validation.",
+                        "fields": [{"error_type": "missing", "field": "refresh_token"}],
+                    },
+                }
+            }
+        }
+    },
+}

@@ -96,6 +96,26 @@ async def invalidate_refresh_token(user: User) -> None:
         raise
 
 
+async def get_user_session(user_id: str | None, user: User | None) -> UserSession | None:
+    """Fetches a user session document from the database, given the user."""
+
+    if user_id is None and user is None:
+        raise ValueError("Invalid input. Pass either user or user_id.")
+
+    if user_id is not None:
+        user_id_ = PydanticObjectId(user_id)
+    elif user is not None:
+        user_id_ = user.id
+
+    try:
+        user_session = await UserSession.find_one(UserSession.user.id == user_id_)  # type: ignore
+    except Exception as exc:
+        logger.error(f"error fetching user session: {exc}")
+        raise
+
+    return user_session
+
+
 async def delete_expired_blacklisted_tokens(delete_older_than: dt.datetime) -> None:
     """Deletes expired blacklisted tokens older than the given date range, from the database.
     Compares tokens' expiration times with the given date range."""
