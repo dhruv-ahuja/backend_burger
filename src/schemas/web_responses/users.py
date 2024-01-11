@@ -154,6 +154,7 @@ UPDATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     },
 }
 
+
 DELETE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
     **COMMON_RESPONSES,
     404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},

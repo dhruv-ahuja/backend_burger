@@ -1,23 +1,10 @@
 from typing import Any
 
 from src.schemas.web_responses.common import COMMON_RESPONSES
+from src.schemas.web_responses.users import USER_NOT_FOUND_RESPONSE
 
 
-INVALID_CREDENTIALS_RESPONSE = {
-    "content": {
-        "application/json": {
-            "example": {
-                "data": None,
-                "error": {
-                    "type": "invalid_credentials",
-                    "message": "Invalid credentials entered.",
-                    "fields": None,
-                },
-            }
-        }
-    }
-}
-
+# TODO: add 400 responses
 LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
     **COMMON_RESPONSES,
     200: {
@@ -34,24 +21,36 @@ LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
             }
         }
     },
-    401: INVALID_CREDENTIALS_RESPONSE,
-}
-
-LOGOUT_RESPONSES: dict[int | str, dict[str, Any]] = {
-    **COMMON_RESPONSES,
-    401: INVALID_CREDENTIALS_RESPONSE,
-    403: {
+    400: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": None,
+                    "error": {"type": "invalid_input", "message": "invalid username", "fields": None},
+                },
+            }
+        }
+    },
+    404: {"content": {"application/json": {"example": USER_NOT_FOUND_RESPONSE}}},
+    422: {
         "content": {
             "application/json": {
                 "example": {
                     "data": None,
                     "error": {
-                        "type": "insufficient_permission",
-                        "message": "Insufficient permission to access resource.",
-                        "fields": None,
+                        "type": "validation_error",
+                        "message": "Input failed validation.",
+                        "fields": [
+                            {"error_type": "missing", "field": "username"},
+                            {"error_type": "missing", "field": "password"},
+                        ],
                     },
                 }
             }
         }
     },
 }
+LOGIN_RESPONSES.pop(403)
+
+
+LOGOUT_RESPONSES: dict[int | str, dict[str, Any]] = {**COMMON_RESPONSES}
