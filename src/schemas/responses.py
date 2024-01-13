@@ -1,5 +1,7 @@
 from typing import Any, Generic, TypeVar
 
+from fastapi.responses import ORJSONResponse
+from starlette import status
 from pydantic import BaseModel, Field, root_validator
 
 
@@ -36,3 +38,31 @@ class BaseResponse(BaseModel, Generic[T, E]):
         values["data"] = {key: data}
 
         return values
+
+
+class AppResponse(ORJSONResponse, Generic[T, E]):
+    """Custom Response class that prevents the parent `ORJSONResponse` class from re-serializing already serialized
+    content."""
+
+    def __init__(
+        self,
+        content: BaseResponse[T, E] | dict | bytes,
+        status_code: int = status.HTTP_200_OK,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        """Dumps Pydantic models or keeps content as is, passing it to the parent `__init__` function."""
+
+        if isinstance(content, BaseResponse):
+            data = content.model_dump()
+        else:
+            data = content
+
+        super().__init__(data, status_code, headers)
+
+    def render(self, content: Any) -> bytes:
+        """Conditionally serialize the content as bytes, and returns it to the client."""
+
+        if isinstance(content, bytes):
+            return content
+
+        return super().render(content)
