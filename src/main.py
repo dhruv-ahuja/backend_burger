@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import ORJSONResponse
 import newrelic.agent
 from pydantic import ValidationError
 from starlette import status
@@ -14,13 +15,13 @@ from src.config.exceptions import (
 from src.config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
 from src.config.services import setup_services
 from src.routers import users, auth
-from src.schemas.responses import AppResponse, BaseResponse
+from src.schemas.responses import BaseResponse
 
 
 newrelic.agent.initialize("./newrelic.ini")
 
 
-app = FastAPI(lifespan=setup_services, redirect_slashes=False)
+app = FastAPI(lifespan=setup_services, redirect_slashes=False, default_response_class=ORJSONResponse)
 
 app.include_router(users.router)
 app.include_router(auth.router)
@@ -41,5 +42,4 @@ app.add_middleware(LoggingMiddleware)
 async def get():
     """Returns a simple success message indicating that the server is up and running."""
 
-    response = BaseResponse(data={"status": "ok"})
-    return AppResponse(response)
+    return BaseResponse(data={"status": "ok"})

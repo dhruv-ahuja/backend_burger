@@ -8,7 +8,7 @@ from starlette import status
 from src import dependencies as deps
 from src.config.constants import app
 from src.models.users import User
-from src.schemas.responses import AppResponse, BaseResponse
+from src.schemas.responses import BaseResponse
 from src.schemas.web_responses import auth as resp
 from src.services import auth as service
 from src.utils import auth_utils
@@ -32,7 +32,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     await service.save_session_details(user, refresh_token, refresh_token_expiration_time)
 
     response = BaseResponse(data={"access_token": access_token, "refresh_token": refresh_token, "type": "Bearer"})
-    return AppResponse(response)
+    return response
 
 
 @router.get("/logout", status_code=status.HTTP_204_NO_CONTENT, responses=resp.LOGOUT_RESPONSES)

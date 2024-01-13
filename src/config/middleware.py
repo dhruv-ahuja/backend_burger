@@ -5,12 +5,14 @@ import os
 import inspect
 
 from fastapi import Request, Response
+from fastapi.responses import ORJSONResponse
 from loguru import logger
+from starlette import status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.types import ASGIApp
 
-from src.config.exceptions import ERROR_RESPONSE
-from src.schemas.responses import AppErrorResponse
+from src.config.constants.exceptions import ERROR_MAPPING
+from src.schemas.responses import BaseError, BaseResponse
 
 
 class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
@@ -19,7 +21,7 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response | AppErrorResponse:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         try:
             response = await call_next(request)
         except Exception as exc:
@@ -35,7 +37,12 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
             logger.error(
                 f"exception type {exc_type}, object: {exc_object} at file {exc_filename}, line no. {exc_linenumber} when processing request: {exc}"
             )
-            return ERROR_RESPONSE
+
+            response = BaseResponse(
+                data=None,
+                error=BaseError(type=ERROR_MAPPING[500].type_, message=ERROR_MAPPING[500].message),
+            )
+            return ORJSONResponse(response.model_dump(), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return response
 

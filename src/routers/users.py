@@ -6,7 +6,7 @@ from starlette import status
 from src import dependencies as deps
 from src.models.users import User
 from src.schemas.web_responses import users as resp
-from src.schemas.responses import AppResponse, BaseResponse
+from src.schemas.responses import BaseResponse
 from src.schemas.users import UserInput, UserUpdateInput
 from src.services import users as service
 
@@ -23,7 +23,7 @@ async def create_user(user_input: UserInput):
 
     # convert to string to avoid json serialization error
     data = {"user_id": str(user_id)}
-    return AppResponse(BaseResponse(data=data))
+    return BaseResponse(data=data)
 
 
 @router.get("/", responses=resp.GET_USERS_RESPONSES)
@@ -33,7 +33,7 @@ async def get_all_users(_=Depends(deps.check_access_token)):
     logger.info("fetching all users")
     users = await service.get_users()
 
-    return AppResponse(BaseResponse(data=users, key="users"), use_dict=True)
+    return BaseResponse(data=users, key="users")
 
 
 @router.get("/{user_id}", responses=resp.GET_USER_RESPONSES)
@@ -43,7 +43,7 @@ async def get_user(user_id: PydanticObjectId, _=Depends(deps.check_access_token)
     logger.info(f"fetching user with id: {user_id}")
     user = await service.get_user(user_id)
 
-    return AppResponse(BaseResponse(data=user))
+    return BaseResponse(data=user)
 
 
 @router.put("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=resp.UPDATE_USER_RESPONSES)
