@@ -1,4 +1,6 @@
+import datetime as dt
 from typing import cast
+
 from beanie import PydanticObjectId
 from fastapi import HTTPException
 from loguru import logger
@@ -100,6 +102,7 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
 
     user.name = user_input.name
     user.email = user_input.email
+    user.updated_time = dt.datetime.now()
 
     try:
         await user.replace()  # type: ignore
