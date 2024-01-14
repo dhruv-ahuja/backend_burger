@@ -23,6 +23,7 @@ from mypy_boto3_sqs import SQSServiceResource
 from mypy_boto3_sqs.service_resource import Queue
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from redis.asyncio import Redis
 from watchtower import CloudWatchLogHandler
 
 from src.config.constants import app, logs
@@ -55,6 +56,9 @@ class Settings(BaseSettings):
     db_url: SecretStr
 
     jwt_secret_key: SecretStr
+
+    redis_host: str
+    redis_password: SecretStr
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -214,6 +218,13 @@ async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Do
     logger.info("successfully connected to database")
 
 
+def initialize_redis_service(redis_host: str, redis_password: str) -> Redis:
+    """Connects to the redis database given its host and password, and establishes an async connection."""
+
+    redis_client = Redis(host=redis_host, password=redis_password, decode_responses=False)
+    return redis_client
+
+
 @asynccontextmanager
 async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to and initializes required services on FastAPI app startup. These services live throughout
@@ -233,6 +244,8 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
     await connect_to_mongodb(settings.db_url.get_secret_value(), document_models)
 
+    redis_client = initialize_redis_service(settings.redis_host, settings.redis_password.get_secret_value())
+
     async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()
     jobs.schedule_logs_upload_job(s3_bucket, scheduler)
@@ -246,6 +259,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     # inject services into global app state
     app_.state.queue = queue
     app_.state.bucket = s3_bucket
+    app_.state.redis = redis_client
     app_.state.scheduler = scheduler
 
     yield

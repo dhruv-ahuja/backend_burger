@@ -11,14 +11,15 @@ from src.schemas.users import Role, UserBase, UserInput, UserUpdateInput
 from src.utils import auth_utils
 
 
-async def create_user(user_input: UserInput) -> PydanticObjectId | None:
-    """Creates a user in the database, and returns the newly created user's ID."""
+async def create_user(user_input: UserInput) -> UserBase:
+    """Creates a user in the database, and returns a `UserBase` representation of the newly created `User` document
+    instance."""
 
     hashed_password = auth_utils.hash_value(user_input.password.get_secret_value())
     user = User(name=user_input.name, email=user_input.email, password=SecretStr(hashed_password), role=Role.user)
 
     try:
-        user = await user.insert()  # type: ignore
+        user: User = await user.insert()  # type: ignore
     except DuplicateKeyError:
         logger.error("error creating user: duplicate email used")
         raise HTTPException(HTTP_400_BAD_REQUEST, "Email associated with another account.")
@@ -26,11 +27,11 @@ async def create_user(user_input: UserInput) -> PydanticObjectId | None:
         logger.error(f"error creating user: {exc}; error type: {exc.__class__}")
         raise
 
-    return user.id
+    return UserBase.model_construct(**user.model_dump())
 
 
 async def get_users() -> list[UserBase]:
-    """Fetches users from the database, returning them as a list of UserBase instances."""
+    """Fetches users from the database, returning them as a list of `UserBase` instances."""
 
     try:
         user_records = await User.find_all().to_list()
@@ -89,8 +90,9 @@ async def get_user(user_id: PydanticObjectId) -> UserBase:
     return user
 
 
-async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) -> None:
-    """Updates a user in the database, if the user exists, given the user ID."""
+async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) -> UserBase:
+    """Updates a user in the database, if the user exists, given the user ID. Creates and returns a `UserBase`
+    instance from the `User` document instance."""
 
     # fetch user and narrow its type to prevent type errors
     user = await get_user_from_database(user_id)
@@ -107,6 +109,8 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
     except Exception as exc:
         logger.error(f"error updating user details: {exc}")
         raise
+
+    return UserBase.model_construct(**user.model_dump())
 
 
 async def delete_user(user_id: PydanticObjectId) -> None:
