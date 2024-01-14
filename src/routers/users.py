@@ -11,7 +11,7 @@ from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserInput, UserUpdateInput
 from src.services import users as service
-from src.utils.services import serialize_response
+from src.utils.services import delete_cached_data, serialize_response, get_cached_data, cache_data
 
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -28,7 +28,7 @@ async def create_user(request: Request, user_input: UserInput):
     redis_key = f"{app.USER_CACHE_KEY}:{user_base.id}"
 
     serialized_user = serialize_response(BaseResponse(data=user_base))
-    await redis_client.set(redis_key, serialized_user, ex=app.SINGLE_USER_CACHE_DURATION)
+    await cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
 
     # convert to string to avoid json serialization error
     data = {"user_id": str(user_base.id)}
@@ -44,13 +44,13 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
     redis_client: Redis = request.app.state.redis
     redis_key = app.USER_CACHE_KEY
 
-    serialized_users = await redis_client.get(redis_key)
+    serialized_users = await get_cached_data(redis_key, redis_client)
 
     if serialized_users is None:
         users = await service.get_users()
 
         serialized_users = serialize_response(BaseResponse(data=users, key="users"))
-        await redis_client.set(redis_key, serialized_users, ex=app.USERS_CACHE_DURATION)
+        await cache_data(redis_key, serialized_users, app.USERS_CACHE_DURATION, redis_client)
 
     return AppResponse(serialized_users)
 
@@ -64,13 +64,13 @@ async def get_user(request: Request, user_id: PydanticObjectId, _=Depends(deps.c
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
 
-    serialized_user = await redis_client.get(redis_key)
+    serialized_user = await get_cached_data(redis_key, redis_client)
 
     if serialized_user is None:
         user_base = await service.get_user(user_id)
 
         serialized_user = serialize_response(BaseResponse(data=user_base))
-        await redis_client.set(redis_key, serialized_user, ex=app.SINGLE_USER_CACHE_DURATION)
+        await cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
 
     return AppResponse(serialized_user)
 
@@ -94,7 +94,7 @@ async def update_user(
 
     # create, serialize and cache single user response object
     serialized_user = serialize_response(BaseResponse(data=user_base))
-    await redis_client.set(redis_key, serialized_user, ex=app.SINGLE_USER_CACHE_DURATION)
+    await cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=resp.DELETE_USER_RESPONSES)
@@ -109,4 +109,4 @@ async def delete_user(request: Request, user_id: PydanticObjectId, user: User = 
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
 
-    await redis_client.delete(redis_key)
+    await delete_cached_data(redis_key, redis_client)
