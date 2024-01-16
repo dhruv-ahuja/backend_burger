@@ -209,8 +209,7 @@ async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Do
     logger.info("connecting to database")
 
     try:
-        client = AsyncIOMotorClient(db_url)
-        await beanie.init_beanie(database=client.backendBurger, document_models=document_models)  # type: ignore
+        await beanie.init_beanie(database=db_client.backendBurger, document_models=document_models)  # type: ignore
     except Exception as exc:
         logger.error(f"error initializing database connection: {exc}")
         raise
@@ -269,3 +268,5 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
 
 settings = generate_settings_config()
+# initialize global client object for use across app
+db_client = AsyncIOMotorClient(settings.db_url.get_secret_value())

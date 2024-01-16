@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import cast
 
-from beanie import PydanticObjectId
+from beanie import DeleteRules, PydanticObjectId
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
@@ -63,7 +63,7 @@ async def get_user_from_database(user_id: PydanticObjectId | None, missing_user_
     is `True`."""
 
     try:
-        user = await User.get(user_id)
+        user = await User.get(user_id, fetch_links=True)
     except Exception as exc:
         logger.error(f"error fetching user: {exc}")
         raise
@@ -124,7 +124,7 @@ async def delete_user(user_id: PydanticObjectId) -> None:
     user = cast(User, user)
 
     try:
-        await user.delete()  # type: ignore
+        await user.delete(link_rule=DeleteRules.DELETE_LINKS)  # type: ignore
     except Exception as exc:
         logger.error(f"error deleting user: {exc}")
         raise

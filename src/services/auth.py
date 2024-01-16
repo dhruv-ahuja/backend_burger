@@ -6,6 +6,7 @@ import bson.errors
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
+from motor.core import AgnosticClientSession
 from starlette import status
 
 from src.models.users import User, BlacklistedToken, UserSession
@@ -56,13 +57,15 @@ async def save_session_details(user: User, refresh_token: str, expiration_time: 
         raise
 
 
-async def blacklist_access_token(user: User, access_token: str, expiration_time: dt.datetime) -> None:
+async def blacklist_access_token(
+    user: User, access_token: str, expiration_time: dt.datetime, db_session: AgnosticClientSession | None = None
+) -> None:
     """Adds an access token to the BlacklistTokens records, marking it as invalid for the application."""
 
     blacklist_record = BlacklistedToken(user=user, access_token=access_token, expiration_time=expiration_time)  # type: ignore
 
     try:
-        await blacklist_record.insert()  # type: ignore
+        await blacklist_record.insert(session=db_session)  # type: ignore
     except Exception as exc:
         logger.error(f"error adding token to blacklist: {exc}")
         raise
@@ -80,7 +83,7 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
     return blacklisted_token
 
 
-async def invalidate_refresh_token(user: User) -> None:
+async def invalidate_refresh_token(user: User, db_session: AgnosticClientSession | None = None) -> None:
     """Removes the user's refresh token details from the database, invalidating it for the application."""
 
     values_to_update = {
@@ -90,14 +93,17 @@ async def invalidate_refresh_token(user: User) -> None:
     }
 
     try:
-        await UserSession.find_one(UserSession.user.id == user.id).update(Set(values_to_update))  # type: ignore
+        await UserSession.find_one(UserSession.user.id == user.id, session=db_session).update(  # type: ignore
+            Set(values_to_update),
+            session=db_session,  # type: ignore
+        )  # type: ignore
     except Exception as exc:
         logger.error(f"error invalidating refresh token: {exc}")
         raise
 
 
 async def get_user_session(user_id: str | None, user: User | None) -> UserSession | None:
-    """Fetches a user session document from the database, given the user."""
+    """Fetches a user session document from the database, given the `user` or `user_id`."""
 
     if user_id is None and user is None:
         raise ValueError("Invalid input. Pass either user or user_id.")

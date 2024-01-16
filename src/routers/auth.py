@@ -3,6 +3,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
+from motor.core import AgnosticClientSession
 from starlette import status
 
 from src import dependencies as deps
@@ -40,11 +41,13 @@ async def logout(
     access_token: str = Depends(deps.oauth2_scheme),
     token_data: dict[str, Any] = Depends(deps.check_access_token),
     user: User = Depends(deps.get_current_user),
+    db_session: AgnosticClientSession = Depends(deps.get_db_session),
 ):
     """Logs the current user out of the application."""
 
-    await service.blacklist_access_token(user, access_token, token_data["exp"])
-    await service.invalidate_refresh_token(user)
+    async with db_session.start_transaction():
+        await service.invalidate_refresh_token(user, db_session)
+        await service.blacklist_access_token(user, access_token, token_data["exp"], db_session)
 
 
 @router.post("/token", responses=resp.TOKEN_RESPONSES)
