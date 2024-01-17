@@ -1,6 +1,36 @@
 version: "3"
 
 services:
+  mongodb_burger: 
+    image: mongodb/mongodb-community-server:7.0.2-ubuntu2204
+    container_name: mongodb_burger
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${DB_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${DB_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - ~/docker_data/mongo:/data/db
+    networks:
+      - backend_burger_network
+
+  redis_burger: 
+    image: redis:7.2.4
+    container_name: redis_burger
+    restart: unless-stopped
+    command:
+      - "--save 60 100"
+      - "--save 300 50"
+      - "--save 900 1"
+      - "--appendonly yes"
+      - "--requirepass ${REDIS_PASSWORD}"
+    ports:
+      - "6379:6379"
+    volumes:
+      - ~/docker_data/redis:/data
+    networks:
+      - backend_burger_network 
+
   backend_burger: 
     image: backend_burger:${VERSION}
     container_name: backend_burger
@@ -20,12 +50,16 @@ services:
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME}
       - NEW_RELIC_APP_NAME=backend_burger_docker
       - ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
+      - REDIS_HOST=redis_burger
     env_file:
       - .env
     ports:
       - "8000:8000"
     networks:
-    - backend_burger_network
+      - backend_burger_network
+    depends_on:
+      - redis_burger
+      - mongodb_burger
   
 networks:
   backend_burger_network:

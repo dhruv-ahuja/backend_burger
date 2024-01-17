@@ -4,7 +4,7 @@ anyio==3.7.1
 APScheduler==3.10.4
 argon2-cffi==23.1.0
 argon2-cffi-bindings==21.2.0
-beanie==1.23.6
+beanie==1.24.0
 billiard==4.2.0
 boto3==1.28.85
 boto3-stubs==1.28.85
@@ -20,9 +20,10 @@ cryptography==41.0.7
 dnspython==2.4.2
 ecdsa==0.18.0
 email-validator==2.1.0.post1
-fastapi==0.104.1
+fastapi==0.109.0
 gunicorn==21.2.0
 h11==0.14.0
+hiredis==2.3.2
 httptools==0.6.1
 idna==3.4
 iniconfig==2.0.0
@@ -63,12 +64,13 @@ python-jose==3.3.0
 python-multipart==0.0.6
 pytz==2023.3.post1
 PyYAML==6.0.1
+redis==5.0.1
 rsa==4.9
 ruff==0.1.5
 s3transfer==0.7.0
 six==1.16.0
 sniffio==1.3.0
-starlette==0.27.0
+starlette==0.35.1
 toml==0.10.2
 types-awscrt==0.19.10
 types-s3transfer==0.7.0
