@@ -1,5 +1,5 @@
 import datetime as dt
-from typing import Annotated, List
+from typing import Annotated
 
 from beanie import Document, Indexed, Link, BackLink
 from pydantic import Field, SecretStr
@@ -13,7 +13,6 @@ class User(UserBase, Document):
     """User represents a User of the application."""
 
     password: SecretStr = Field(min_length=8)
-    blacklisted_tokens: List[BackLink["BlacklistedToken"]] | None = Field(original_field="user", default=None)  # type: ignore
     session: BackLink["UserSession"] | None = Field(original_field="user", default=None)  # type: ignore
 
     class Settings:

@@ -5,6 +5,7 @@ from beanie import DeleteRules, PydanticObjectId
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
+from motor.core import AgnosticClientSession
 from pymongo.errors import DuplicateKeyError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
@@ -124,7 +125,7 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
     return UserBase.model_construct(**user.model_dump())
 
 
-async def delete_user(user_id: PydanticObjectId) -> None:
+async def delete_user(user_id: PydanticObjectId, db_session: AgnosticClientSession | None = None) -> None:
     """Deletes a user from the database, if the user exists, given the user ID."""
 
     # fetch user and narrow its type to prevent type errors
@@ -132,7 +133,7 @@ async def delete_user(user_id: PydanticObjectId) -> None:
     user = cast(User, user)
 
     try:
-        await user.delete(link_rule=DeleteRules.DELETE_LINKS)  # type: ignore
+        await user.delete(link_rule=DeleteRules.DELETE_LINKS, session=db_session)  # type: ignore
     except Exception as exc:
         logger.error(f"error deleting user: {exc}")
         raise

@@ -39,13 +39,11 @@ async def get_cached_data(key: str, redis_client: Redis) -> bytes | None:
     return data
 
 
-async def delete_cached_data(key: str, redis_client: Redis) -> bytes | None:
-    """Fetches data associated with the given `key` value. Returns `None` if no data was present."""
+async def delete_cached_data(key: str, redis_client: Redis) -> None:
+    """Deletes cached data associated with the given key."""
 
     try:
-        data = await redis_client.delete(key)
+        await redis_client.delete(key)
     except RedisError as exc:
         logger.error(f"error deleting cached data: {exc}")
         raise
-
-    return data

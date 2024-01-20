@@ -1,6 +1,7 @@
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Request
 from loguru import logger
+from motor.core import AgnosticClientSession
 from redis.asyncio import Redis
 from starlette import status
 
@@ -10,7 +11,7 @@ from src.models.users import User
 from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserInput, UserUpdateInput
-from src.services import users as service
+from src.services import users as service, auth as auth_service
 from src.utils import routers as routers_utils, services as services_utils
 
 
@@ -46,7 +47,7 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
 
     get_user_function = service.get_users()
     serialized_users = await routers_utils.get_serialized_entity(
-        redis_key, get_user_function, None, app.SINGLE_USER_CACHE_DURATION, redis_client
+        redis_key, get_user_function, None, app.USERS_CACHE_DURATION, redis_client
     )
 
     return AppResponse(serialized_users)
@@ -110,15 +111,28 @@ async def update_user(
 
 
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT, responses=resp.DELETE_USER_RESPONSES)
-async def delete_user(request: Request, user_id: PydanticObjectId, user: User = Depends(deps.get_current_user)) -> None:
+async def delete_user(
+    request: Request,
+    user_id: PydanticObjectId,
+    access_token: str = Depends(deps.oauth2_scheme),
+    token_data=Depends(deps.check_access_token),
+    user: User = Depends(deps.get_current_user),
+    db_session: AgnosticClientSession = Depends(deps.get_db_session),
+) -> None:
     """Deletes a single user from the database, if the user exists."""
 
-    await deps.check_access_to_user_resource(user_id, user)
-
     logger.info(f"deleting user with id: {user_id}")
-    await service.delete_user(user_id)
+    await deps.check_access_to_user_resource(user_id, user)
 
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
 
-    await services_utils.delete_cached_data(redis_key, redis_client)
+    async with db_session.start_transaction():
+        try:
+            await services_utils.delete_cached_data(redis_key, redis_client)
+        except Exception:
+            await db_session.abort_transaction()
+            raise
+
+        await auth_service.blacklist_access_token(user, access_token, token_data["exp"], db_session)
+        await service.delete_user(user_id, db_session)
