@@ -58,12 +58,20 @@ async def get_users() -> list[UserBase]:
     return users
 
 
-async def get_user_from_database(user_id: PydanticObjectId | None, missing_user_error: bool = True) -> User | None:
+async def get_user_from_database(
+    user_id: PydanticObjectId | None, user_email: str | None = None, missing_user_error: bool = True
+) -> User | None:
     """Fetches a user from the database. Raises a 404 error if the user does not exist and `missing_user_error`
     is `True`."""
 
+    if user_id is None and user_email is None:
+        raise ValueError("Invalid input. Pass either user_id or user_email.")
+
     try:
-        user = await User.get(user_id, fetch_links=True)
+        if user_id is not None:
+            user = await User.get(user_id, fetch_links=True)
+        else:
+            user = await User.find(User.email == user_email, fetch_links=True).first_or_none()  # type: ignore
     except Exception as exc:
         logger.error(f"error fetching user: {exc}")
         raise

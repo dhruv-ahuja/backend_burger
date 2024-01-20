@@ -2,7 +2,6 @@ import datetime as dt
 
 from beanie import PydanticObjectId
 from beanie.operators import Set
-import bson.errors
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
@@ -19,12 +18,8 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
 
     invalid_credentials_error = HTTPException(status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Bearer"})
 
-    try:
-        user_id = PydanticObjectId(form_data.username)
-    except bson.errors.InvalidId:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid username")
-
-    user = await users_service.get_user_from_database(user_id, False)
+    user_email = form_data.username
+    user = await users_service.get_user_from_database(None, user_email, missing_user_error=False)
     if user is None:
         raise invalid_credentials_error
 

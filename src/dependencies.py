@@ -56,7 +56,7 @@ async def get_current_user(token_data: dict[str, Any] = Depends(check_access_tok
     except bson.errors.InvalidId:
         raise forbidden_error
 
-    user = await users_service.get_user_from_database(user_id, False)
+    user = await users_service.get_user_from_database(user_id, missing_user_error=False)
     if user is None:
         raise forbidden_error
 
