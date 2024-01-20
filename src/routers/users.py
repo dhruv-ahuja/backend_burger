@@ -55,6 +55,28 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
     return AppResponse(serialized_users)
 
 
+# TODO: reduce duplication logic across various endpoints
+# TODO: get cached data from dependency handler
+@router.get("/current", responses=resp.GET_CURRENT_USER_RESPONSES)
+async def get_current_user(request: Request, token_data=Depends(deps.check_access_token)):
+    """Fetches the current user's details from the database, if the user exists."""
+
+    user_id = token_data["sub"]
+
+    redis_client: Redis = request.app.state.redis
+    redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
+
+    serialized_user = await get_cached_data(redis_key, redis_client)
+
+    if serialized_user is None:
+        user_base = await service.get_user(user_id)
+
+        serialized_user = serialize_response(BaseResponse(data=user_base))
+        await cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
+
+    return AppResponse(serialized_user)
+
+
 @router.get("/{user_id}", responses=resp.GET_USER_RESPONSES)
 async def get_user(request: Request, user_id: PydanticObjectId, _=Depends(deps.check_access_token)):
     """Fetches a single user from the database, if the user exists."""

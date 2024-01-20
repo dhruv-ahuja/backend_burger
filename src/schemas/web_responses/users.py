@@ -91,8 +91,8 @@ GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
                 "example": {
                     "data": {
                         "id": "6574342ba63e1afa0f597aa5",
-                        "name": "Dhruv Ahuja",
-                        "email": "dhruvahuja2k@gmail.com",
+                        "name": "Dhruv A.",
+                        "email": "randomEmail@gmail.com",
                         "date_created": "2023-12-09T15:02:27.333000",
                         "date_updated": "2023-12-09T15:02:27.333000",
                     },
@@ -116,6 +116,26 @@ GET_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
             }
         },
         "data": None,
+    },
+}
+
+GET_CURRENT_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
+    **COMMON_RESPONSES,
+    200: {
+        "content": {
+            "application/json": {
+                "example": {
+                    "data": {
+                        "id": "6574342ba63e1afa0f597aa5",
+                        "name": "Dhruv A.",
+                        "email": "randomEmail@gmail.com",
+                        "date_created": "2023-12-09T15:02:27.333000",
+                        "date_updated": "2023-12-09T15:02:27.333000",
+                    },
+                    "error": None,
+                }
+            },
+        },
     },
 }
 
