@@ -1,3 +1,4 @@
+from typing import cast
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, Request
 from loguru import logger
@@ -7,6 +8,7 @@ from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
+from src.models.users import User
 from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserBase, UserInput, UserUpdateInput
@@ -110,16 +112,19 @@ async def delete_user(
     user_id: PydanticObjectId,
     access_token: str = Depends(deps.oauth2_scheme),
     token_data=Depends(deps.check_access_token),
-    user: UserBase = Depends(deps.get_current_user),
+    user_base: UserBase = Depends(deps.get_current_user),
     db_session: AgnosticClientSession = Depends(deps.get_db_session),
 ) -> None:
     """Deletes a single user from the database, if the user exists."""
 
     logger.info(f"deleting user with id: {user_id}")
-    await deps.check_access_to_user_resource(user_id, user)
+    await deps.check_access_to_user_resource(user_id, user_base)
 
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
+
+    user = await service.get_user_from_database(user_base.id)
+    user = cast(User, user)
 
     async with db_session.start_transaction():
         try:
@@ -129,4 +134,4 @@ async def delete_user(
             raise
 
         await auth_service.blacklist_access_token(user, access_token, token_data["exp"], db_session)
-        await service.delete_user(user_id, db_session)
+        await service.delete_user(user, db_session)

@@ -1,7 +1,7 @@
 import datetime as dt
 from typing import cast
 
-from beanie import DeleteRules, PydanticObjectId
+from beanie import PydanticObjectId
 from fastapi import HTTPException
 from loguru import logger
 from pydantic import SecretStr
@@ -133,15 +133,11 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
     return UserBase.model_construct(**user.model_dump())
 
 
-async def delete_user(user_id: PydanticObjectId, db_session: AgnosticClientSession | None = None) -> None:
-    """Deletes a user from the database, if the user exists, given the user ID."""
-
-    # fetch user and narrow its type to prevent type errors
-    user = await get_user_from_database(user_id)
-    user = cast(User, user)
+async def delete_user(user: User, db_session: AgnosticClientSession | None = None) -> None:
+    """Deletes a user from the database."""
 
     try:
-        await user.delete(link_rule=DeleteRules.DELETE_LINKS, session=db_session)  # type: ignore
+        await user.delete(session=db_session)  # type: ignore
     except Exception as exc:
         logger.error(f"error deleting user: {exc}")
         raise
