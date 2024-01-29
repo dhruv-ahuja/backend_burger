@@ -49,3 +49,11 @@ class UserBase(BaseModel):
     role: Role
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
+
+
+class UserSession(BaseModel):
+    """UserSession encapsulates the user's session logic."""
+
+    refresh_token: str | None
+    expiration_time: dt.datetime | None
+    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)

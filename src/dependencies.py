@@ -1,7 +1,7 @@
 import datetime as dt
 import orjson
 import pytz
-from typing import Any
+from typing import Any, cast
 
 from beanie import PydanticObjectId
 from fastapi import Depends, HTTPException, Request
@@ -15,7 +15,7 @@ from src.config.services import db_client
 from src.schemas.users import Role, UserBase
 from src.utils import auth_utils, services as services_utils
 from src.models.users import User
-from src.services import auth as auth_service
+from src.services import auth as auth_service, users as users_service
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -84,13 +84,20 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
     user_id = token_data["sub"]
     expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
 
-    user_session = await auth_service.get_user_session(user_id, None)
-
-    if user_session is None or user_session.expiration_time is None or user_session.expiration_time is None:
+    user = await users_service.get_user_from_database(user_id, missing_user_error=False)
+    if (
+        user is None
+        or user.session is None
+        or user.session.expiration_time is None
+        or user.session.refresh_token is None
+    ):
         raise forbidden_error
 
+    user_session = user.session
+    session_expiration_time = cast(dt.datetime, user_session.expiration_time)
+
     # TODO: save all dates as utc and remove this step
-    session_token_expiration_time = pytz.utc.localize(user_session.expiration_time)
+    session_token_expiration_time = pytz.utc.localize(session_expiration_time)
     session_refresh_token = user_session.refresh_token
 
     if session_token_expiration_time < expiration_time or session_refresh_token != refresh_token:

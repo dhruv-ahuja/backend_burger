@@ -1,15 +1,14 @@
 import datetime as dt
+from typing import cast
 
-from beanie import PydanticObjectId
-from beanie.operators import Set
 from fastapi import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from motor.core import AgnosticClientSession
 from starlette import status
 
-from src.models.users import User, BlacklistedToken, UserSession
-from src.schemas.users import UserBase
+from src.models.users import User, BlacklistedToken
+from src.schemas.users import UserBase, UserSession
 from src.services import users as users_service
 from src.utils.auth_utils import compare_values
 
@@ -42,21 +41,27 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> UserB
     return user_base
 
 
-async def save_session_details(user: User | UserBase, refresh_token: str, expiration_time: dt.datetime) -> None:
+async def save_session_details(
+    user: User | UserBase,
+    refresh_token: str,
+    expiration_time: dt.datetime,
+    db_session: AgnosticClientSession | None = None,
+) -> None:
     """Saves users session details, storing the issued refresh token and its expiration time in the database.
     Re-uses an existing session record or creates a new one."""
 
-    values_to_update = {
-        UserSession.refresh_token: refresh_token,
-        UserSession.expiration_time: expiration_time,
-        UserSession.updated_time: dt.datetime.now(),
-    }
+    now = dt.datetime.now()
 
     try:
-        await UserSession.find_one(UserSession.user.id == user.id).upsert(  # type: ignore
-            Set(values_to_update),
-            on_insert=UserSession(user=user, refresh_token=refresh_token, expiration_time=expiration_time),  # type: ignore
+        user_record = await users_service.get_user_from_database(user.id)
+        user_record = cast(User, user_record)
+
+        user_record.session = UserSession(
+            refresh_token=refresh_token, expiration_time=expiration_time, updated_time=now
         )
+        user_record.updated_time = now
+
+        await user_record.replace()  # type: ignore
     except Exception as exc:
         logger.error(f"error saving user session details: {exc}")
         raise
@@ -91,43 +96,19 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
     return blacklisted_token
 
 
-async def invalidate_refresh_token(user: User | UserBase, db_session: AgnosticClientSession | None = None) -> None:
-    """Removes the user's refresh token details from the database, invalidating it for the application."""
-
-    values_to_update = {
-        UserSession.refresh_token: None,
-        UserSession.expiration_time: None,
-        UserSession.updated_time: dt.datetime.now(),
-    }
+async def invalidate_refresh_token(user: User, db_session: AgnosticClientSession | None = None) -> None:
+    """Removes the user's refresh token details from the database, invalidating it for the application.
+    Returns user object for further use."""
 
     try:
-        await UserSession.find_one(UserSession.user.id == user.id, session=db_session).update(  # type: ignore
-            Set(values_to_update),
-            session=db_session,  # type: ignore
-        )  # type: ignore
+        if user.session is not None:
+            user.session.refresh_token = None
+            user.session.expiration_time = None
+            user.session.updated_time = dt.datetime.now()
+        await user.replace(session=db_session)  # type: ignore
     except Exception as exc:
         logger.error(f"error invalidating refresh token: {exc}")
         raise
-
-
-async def get_user_session(user_id: str | None, user: User | None) -> UserSession | None:
-    """Fetches a user session document from the database, given the `user` or `user_id`."""
-
-    if user_id is None and user is None:
-        raise ValueError("Invalid input. Pass either user or user_id.")
-
-    if user_id is not None:
-        user_id_ = PydanticObjectId(user_id)
-    elif user is not None:
-        user_id_ = user.id
-
-    try:
-        user_session = await UserSession.find_one(UserSession.user.id == user_id_)  # type: ignore
-    except Exception as exc:
-        logger.error(f"error fetching user session: {exc}")
-        raise
-
-    return user_session
 
 
 async def delete_expired_blacklisted_tokens(delete_older_than: dt.datetime) -> None:

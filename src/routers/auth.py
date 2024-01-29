@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Body, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
@@ -9,10 +9,11 @@ from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
+from src.models.users import User
 from src.schemas.responses import BaseResponse
 from src.schemas.users import UserBase
 from src.schemas.web_responses import auth as resp
-from src.services import auth as service
+from src.services import auth as service, users as users_service
 from src.utils import auth_utils, services as services_utils
 
 
@@ -45,8 +46,9 @@ async def login(
         try:
             await services_utils.cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
         except Exception:
-            await service.save_session_details(user, refresh_token, refresh_token_expiration_time)
             raise
+
+        await service.save_session_details(user, refresh_token, refresh_token_expiration_time, db_session)
 
     response = BaseResponse(data={"access_token": access_token, "refresh_token": refresh_token, "type": "Bearer"})
     return response
@@ -56,10 +58,13 @@ async def login(
 async def logout(
     access_token: str = Depends(deps.oauth2_scheme),
     token_data: dict[str, Any] = Depends(deps.check_access_token),
-    user: UserBase = Depends(deps.get_current_user),
+    user_base: UserBase = Depends(deps.get_current_user),
     db_session: AgnosticClientSession = Depends(deps.get_db_session),
 ):
     """Logs the current user out of the application."""
+
+    user = await users_service.get_user_from_database(user_base.id)
+    user = cast(User, user)
 
     async with db_session.start_transaction():
         await service.invalidate_refresh_token(user, db_session)
@@ -71,7 +76,6 @@ async def refresh_token(refresh_token: str = Body(..., embed=True)):
     """Refreshes the user's access token, after checking whether the refresh token is valid and has not yet expired."""
 
     token_data = await deps.check_refresh_token(refresh_token)
-
     access_token, _ = auth_utils.create_bearer_token(app.ACCESS_TOKEN_DURATION, token_data["sub"])
 
     response = BaseResponse(data={"access_token": access_token, "type": "Bearer"})

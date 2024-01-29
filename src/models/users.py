@@ -1,11 +1,10 @@
 import datetime as dt
-from typing import Annotated
 
-from beanie import Document, Indexed, Link, BackLink
+from beanie import Document, Link
 from pydantic import Field, SecretStr
 from pymongo import IndexModel
 
-from src.schemas.users import UserBase
+from src.schemas.users import UserBase, UserSession
 
 
 # TODO: add user status and login attempts columns
@@ -13,7 +12,7 @@ class User(UserBase, Document):
     """User represents a User of the application."""
 
     password: SecretStr = Field(min_length=8)
-    session: BackLink["UserSession"] | None = Field(original_field="user", default=None)  # type: ignore
+    session: UserSession | None = None
 
     class Settings:
         """Defines the settings for the collection."""
@@ -34,17 +33,3 @@ class BlacklistedToken(Document):
         """Defines the settings for the collection."""
 
         name = "blacklisted_tokens"
-
-
-class UserSession(Document):
-    """UserSession holds information regarding user's latest session."""
-
-    user: Annotated[Link[User], Indexed(unique=True)]
-    refresh_token: str | None
-    expiration_time: dt.datetime | None
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    class Settings:
-        """Defines the settings for the collection."""
-
-        name = "users_sessions"
