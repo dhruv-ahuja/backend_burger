@@ -7,10 +7,9 @@ from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
-from src.models.users import User
 from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
-from src.schemas.users import UserInput, UserUpdateInput
+from src.schemas.users import UserBase, UserInput, UserUpdateInput
 from src.services import users as service, auth as auth_service
 from src.utils import routers as routers_utils, services as services_utils
 
@@ -53,7 +52,6 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
     return AppResponse(serialized_users)
 
 
-# TODO: get cached data from dependency handler
 @router.get("/current", responses=resp.GET_CURRENT_USER_RESPONSES)
 async def get_current_user(request: Request, token_data=Depends(deps.check_access_token)):
     """Fetches the current user's details from the database, if the user exists."""
@@ -93,7 +91,7 @@ async def update_user(
     request: Request,
     user_input: UserUpdateInput,
     user_id: PydanticObjectId,
-    user: User = Depends(deps.get_current_user),
+    user: UserBase = Depends(deps.get_current_user),
 ) -> None:
     """Updates a single user in the database, if the user exists."""
 
@@ -116,7 +114,7 @@ async def delete_user(
     user_id: PydanticObjectId,
     access_token: str = Depends(deps.oauth2_scheme),
     token_data=Depends(deps.check_access_token),
-    user: User = Depends(deps.get_current_user),
+    user: UserBase = Depends(deps.get_current_user),
     db_session: AgnosticClientSession = Depends(deps.get_db_session),
 ) -> None:
     """Deletes a single user from the database, if the user exists."""

@@ -83,13 +83,21 @@ async def get_user_from_database(
     return user
 
 
-async def get_user(user_id: PydanticObjectId) -> UserBase:
-    """Fetches and returns a user from the database, if user exists, given the user ID."""
+async def get_user(
+    user_id: PydanticObjectId | None, user_email: str | None = None, missing_user_error: bool = True
+) -> UserBase:
+    """Fetches and returns a user from the database, if user exists, given the user ID or email."""
+
+    if user_id is user_email is None:
+        raise ValueError("Invalid input. Pass either user_id or user_email.")
 
     # fetch user and narrow its type to prevent type errors
-    user_record = await get_user_from_database(user_id)
-    user_record = cast(User, user_record)
+    if user_id is not None:
+        user_record = await get_user_from_database(user_id, missing_user_error=missing_user_error)
+    else:
+        user_record = await get_user_from_database(None, user_email, missing_user_error=missing_user_error)
 
+    user_record = cast(User, user_record)
     user = UserBase(
         id=user_record.id,
         name=user_record.name,

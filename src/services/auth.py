@@ -9,12 +9,14 @@ from motor.core import AgnosticClientSession
 from starlette import status
 
 from src.models.users import User, BlacklistedToken, UserSession
+from src.schemas.users import UserBase
 from src.services import users as users_service
 from src.utils.auth_utils import compare_values
 
 
-async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
-    """Checks whether the given credentials are valid, and whether the user exists. Returns the user on success."""
+async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> UserBase:
+    """Checks whether the given credentials are valid, and whether the user exists. Returns the user without password
+    on success."""
 
     invalid_credentials_error = HTTPException(status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Bearer"})
 
@@ -29,10 +31,18 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> User:
     if not valid_password:
         raise invalid_credentials_error
 
-    return user
+    user_base = user = UserBase(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role,
+        created_time=user.created_time,
+        updated_time=user.updated_time,
+    )
+    return user_base
 
 
-async def save_session_details(user: User, refresh_token: str, expiration_time: dt.datetime) -> None:
+async def save_session_details(user: User | UserBase, refresh_token: str, expiration_time: dt.datetime) -> None:
     """Saves users session details, storing the issued refresh token and its expiration time in the database.
     Re-uses an existing session record or creates a new one."""
 
@@ -53,7 +63,10 @@ async def save_session_details(user: User, refresh_token: str, expiration_time: 
 
 
 async def blacklist_access_token(
-    user: User, access_token: str, expiration_time: dt.datetime, db_session: AgnosticClientSession | None = None
+    user: User | UserBase,
+    access_token: str,
+    expiration_time: dt.datetime,
+    db_session: AgnosticClientSession | None = None,
 ) -> None:
     """Adds an access token to the BlacklistTokens records, marking it as invalid for the application."""
 
@@ -78,7 +91,7 @@ async def get_blacklisted_token(token: str) -> BlacklistedToken | None:
     return blacklisted_token
 
 
-async def invalidate_refresh_token(user: User, db_session: AgnosticClientSession | None = None) -> None:
+async def invalidate_refresh_token(user: User | UserBase, db_session: AgnosticClientSession | None = None) -> None:
     """Removes the user's refresh token details from the database, invalidating it for the application."""
 
     values_to_update = {

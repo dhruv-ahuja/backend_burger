@@ -1,19 +1,21 @@
 import datetime as dt
+import orjson
 import pytz
 from typing import Any
 
 from beanie import PydanticObjectId
-import bson.errors
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
+from redis.asyncio import Redis
 from starlette import status
 
+from src.config.constants import app
 from src.config.services import db_client
-from src.schemas.users import Role
-from src.utils import auth_utils
+from src.schemas.users import Role, UserBase
+from src.utils import auth_utils, services as services_utils
 from src.models.users import User
-from src.services import users as users_service, auth as auth_service
+from src.services import auth as auth_service
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -45,25 +47,25 @@ async def check_access_token(access_token: str = Depends(oauth2_scheme)) -> dict
     return token_data
 
 
-async def get_current_user(token_data: dict[str, Any] = Depends(check_access_token)) -> User:
+async def get_current_user(request: Request, token_data: dict[str, Any] = Depends(check_access_token)) -> UserBase:
     """Checks whether the `user_id` inside the token is valid and whether the user exists or not, returning the user
     instance. Raises a 403 error if any of the checks fails."""
 
-    forbidden_error = HTTPException(status.HTTP_403_FORBIDDEN)
+    user_id = token_data["sub"]
+    redis_client: Redis = request.app.state.redis
+    redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
 
-    try:
-        user_id = PydanticObjectId(token_data["sub"])
-    except bson.errors.InvalidId:
-        raise forbidden_error
+    serialized_user_response = await services_utils.get_cached_data(redis_key, redis_client)
+    if serialized_user_response is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN)
 
-    user = await users_service.get_user_from_database(user_id, missing_user_error=False)
-    if user is None:
-        raise forbidden_error
+    user_response_dict: dict = orjson.loads(serialized_user_response)
+    user = UserBase.model_validate(user_response_dict["data"])
 
     return user
 
 
-async def check_access_to_user_resource(input_user_id: PydanticObjectId, user: User) -> None:
+async def check_access_to_user_resource(input_user_id: PydanticObjectId, user: User | UserBase) -> None:
     """Checks whether the current user has access to the current `User` resource."""
 
     forbidden_error = HTTPException(status.HTTP_403_FORBIDDEN)

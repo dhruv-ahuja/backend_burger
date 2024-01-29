@@ -1,26 +1,31 @@
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from motor.core import AgnosticClientSession
+from redis.asyncio import Redis
 from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
-from src.models.users import User
 from src.schemas.responses import BaseResponse
+from src.schemas.users import UserBase
 from src.schemas.web_responses import auth as resp
 from src.services import auth as service
-from src.utils import auth_utils
+from src.utils import auth_utils, services as services_utils
 
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/login", responses=resp.LOGIN_RESPONSES)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Logs the user into the application, checking first whether user credentials."""
+async def login(
+    request: Request,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db_session: AgnosticClientSession = Depends(deps.get_db_session),
+):
+    """Logs the user into the application and caches their data, checking first whether user credentials are valid."""
 
     logger.info("attempting user login")
     user = await service.check_users_credentials(form_data)
@@ -30,7 +35,18 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         app.REFRESH_TOKEN_DURATION, str(user.id)
     )
 
-    await service.save_session_details(user, refresh_token, refresh_token_expiration_time)
+    redis_client: Redis = request.app.state.redis
+    redis_key = f"{app.USER_CACHE_KEY}:{user.id}"
+
+    serialized_user = services_utils.serialize_response(BaseResponse(data=user))
+    await services_utils.cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
+
+    async with db_session.start_transaction():
+        try:
+            await services_utils.cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
+        except Exception:
+            await service.save_session_details(user, refresh_token, refresh_token_expiration_time)
+            raise
 
     response = BaseResponse(data={"access_token": access_token, "refresh_token": refresh_token, "type": "Bearer"})
     return response
@@ -40,7 +56,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 async def logout(
     access_token: str = Depends(deps.oauth2_scheme),
     token_data: dict[str, Any] = Depends(deps.check_access_token),
-    user: User = Depends(deps.get_current_user),
+    user: UserBase = Depends(deps.get_current_user),
     db_session: AgnosticClientSession = Depends(deps.get_db_session),
 ):
     """Logs the current user out of the application."""
