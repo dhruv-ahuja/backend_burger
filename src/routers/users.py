@@ -17,7 +17,7 @@ from src.utils import routers as routers_utils, services as services_utils
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/", responses=resp.CREATE_USER_RESPONSES)
+@router.post("/", responses=resp.CREATE_USER_RESPONSES, status_code=status.HTTP_202_ACCEPTED)
 async def create_user(request: Request, user_input: UserInput):
     """Creates a user in the database and returns the user's ID."""
 
@@ -29,10 +29,6 @@ async def create_user(request: Request, user_input: UserInput):
 
     serialized_user = services_utils.serialize_response(BaseResponse(data=user_base))
     await services_utils.cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
-
-    # convert to string to avoid json serialization error
-    data = {"user_id": str(user_base.id)}
-    return BaseResponse(data=data)
 
 
 @router.get("/", responses=resp.GET_USERS_RESPONSES)

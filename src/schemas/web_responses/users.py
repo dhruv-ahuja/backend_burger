@@ -4,11 +4,6 @@ from src.schemas.web_responses.common import COMMON_RESPONSES
 
 
 CREATE_USER_RESPONSES: Dict[int | str, Dict[str, Any]] = {
-    200: {
-        "content": {
-            "application/json": {"example": {"data": {"user_id": "6577d3f0e39b709bb43e85ae"}, "error": None}},
-        },
-    },
     400: {
         "content": {
             "application/json": {
