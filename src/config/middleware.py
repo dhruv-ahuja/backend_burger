@@ -1,8 +1,8 @@
-import uuid
-import asyncio
-import sys
-import os
 import inspect
+import os
+import sys
+import time
+import uuid
 
 from fastapi import Request, Response
 from fastapi.responses import ORJSONResponse
@@ -55,15 +55,18 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         request_id = str(uuid.uuid4())
-        event_loop = asyncio.get_event_loop()
 
         with logger.contextualize(request_id=request_id):
-            start_time = event_loop.time()
+            start_time = time.monotonic()
             response: Response = await call_next(request)
-            execution_time = event_loop.time() - start_time
+
+            execution_time = round(time.monotonic() - start_time, 3)
+            execution_time_ms = int(execution_time * 1000)
+
+            response.headers["X-Response-Time"] = str(execution_time_ms)
 
             logger.info(
-                f"Completed request: {request.method} {request.url} | time: {execution_time} | status: {response.status_code}"
+                f"Completed request: {request.method} {request.url} | time (ms): {execution_time_ms} | status: {response.status_code}"
             )
 
         return response

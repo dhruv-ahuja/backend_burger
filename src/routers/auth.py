@@ -38,7 +38,6 @@ async def login(
 
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user.id}"
-
     serialized_user = services_utils.serialize_response(BaseResponse(data=user))
     await services_utils.cache_data(redis_key, serialized_user, app.SINGLE_USER_CACHE_DURATION, redis_client)
 
