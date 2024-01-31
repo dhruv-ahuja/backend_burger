@@ -14,7 +14,7 @@ from pytest import FixtureRequest, LogCaptureFixture
 from pytest_mock import MockerFixture
 from pytest_mock.plugin import MockType
 
-from src.config.constants.app import PROJECT_NAME, S3_FOLDER_NAME
+from src.config.constants.app import PROJECT_NAME, S3_FOLDER_NAME, UNIQUE_APP_ID
 from src.config.constants.logs import LOGS_DATETIME_FORMAT
 from src.utils.config import gather_logs, parse_validation_error, upload_logs, setup_job
 
@@ -211,7 +211,7 @@ def test_upload_logs(generate_logs: list[tuple[str, str]], mock_s3_bucket: MockT
     assert mock_s3_bucket.upload_file.call_count == len(logs_paths)
 
     for log_path, file_name in logs_paths:
-        expected_s3_path = f"{S3_FOLDER_NAME}/{file_name}"
+        expected_s3_path = f"{S3_FOLDER_NAME}/{UNIQUE_APP_ID}/{file_name}"
         mock_s3_bucket.upload_file.assert_any_call(log_path, expected_s3_path)
 
 
@@ -233,7 +233,7 @@ def test_setup_job(get_scheduler: BackgroundScheduler, caplog: LogCaptureFixture
     scheduler = get_scheduler
 
     job_id = "sample_job"
-    trigger = DateTrigger(run_date=dt.datetime.now())
+    trigger = DateTrigger(run_date=dt.datetime.utcnow())
     misfire_grace_time = None
 
     job = setup_job(scheduler, sample_job, job_id, trigger, misfire_grace_time)
