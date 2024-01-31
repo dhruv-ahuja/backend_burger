@@ -249,7 +249,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     scheduler = BackgroundScheduler()
     jobs.schedule_logs_upload_job(s3_bucket, scheduler)
 
-    delete_older_than = dt.datetime.now() - dt.timedelta(days=1)
+    delete_older_than = dt.datetime.utcnow() - dt.timedelta(days=1)
     jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
 
     scheduler.start()

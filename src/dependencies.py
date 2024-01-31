@@ -82,7 +82,7 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
 
     token_data = check_bearer_token(refresh_token, forbidden_error)
     user_id = token_data["sub"]
-    expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
+    token_expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
 
     user = await users_service.get_user_from_database(user_id, missing_user_error=False)
     if (
@@ -94,13 +94,12 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
         raise forbidden_error
 
     user_session = user.session
-    session_expiration_time = cast(dt.datetime, user_session.expiration_time)
-
-    # TODO: save all dates as utc and remove this step
-    session_token_expiration_time = pytz.utc.localize(session_expiration_time)
     session_refresh_token = user_session.refresh_token
 
-    if session_token_expiration_time < expiration_time or session_refresh_token != refresh_token:
+    session_expiration_time = cast(dt.datetime, user_session.expiration_time)
+    session_token_expiration_time = pytz.utc.localize(session_expiration_time)
+
+    if session_token_expiration_time < token_expiration_time or session_refresh_token != refresh_token:
         raise forbidden_error
 
     return token_data
