@@ -19,7 +19,7 @@ from src.utils import routers as routers_utils, services as services_utils
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/", responses=resp.CREATE_USER_RESPONSES, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/", responses=resp.CREATE_USER_RESPONSES, status_code=status.HTTP_201_CREATED)
 async def create_user(request: Request, user_input: UserInput):
     """Creates a user in the database and returns the user's ID."""
 
@@ -44,7 +44,7 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
 
     get_user_function = service.get_users()
     serialized_users = await routers_utils.get_serialized_entity(
-        redis_key, get_user_function, None, app.USERS_CACHE_DURATION, redis_client
+        redis_key, get_user_function, "users", app.USERS_CACHE_DURATION, redis_client
     )
 
     return AppResponse(serialized_users)

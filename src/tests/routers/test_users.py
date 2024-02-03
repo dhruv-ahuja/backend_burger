@@ -5,7 +5,6 @@ from src import main
 from src.models.users import User
 from src.schemas.responses import BaseResponse
 from src.schemas.users import UserBase
-# from src.tests.routers.conftest import get_login_tokens
 
 
 @pytest.mark.asyncio
@@ -17,7 +16,7 @@ async def test_create_user():
     async with AsyncClient(app=main.app, base_url="http://test") as client:
         response = await client.post("/users/", json=user_input)
 
-    assert response.status_code == 202
+    assert response.status_code == 201
 
     # perform cleanup
     await User.find_one(User.email == user_input["email"]).delete()
@@ -61,7 +60,7 @@ async def test_create_duplicate_user():
 
     async with AsyncClient(app=main.app, base_url="http://test") as client:
         response = await client.post("/users/", json=user_input)
-        assert response.status_code == 202
+        assert response.status_code == 201
 
         error_response = response = await client.post("/users/", json=user_input)
 

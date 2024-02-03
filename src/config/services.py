@@ -202,7 +202,7 @@ def initialize_aws_services(aws_session: boto3.Session) -> t.Tuple[Queue, Bucket
     return (queue, bucket)
 
 
-async def connect_to_mongodb(db_url: str, document_models: list[t.Type[beanie.Document]]) -> None:
+async def connect_to_mongodb(document_models: list[t.Type[beanie.Document]]) -> None:
     """Connects to the MongoDB database given its URL and list of Beanie `Document` modelss to create, after
     establishing connection."""
 
@@ -241,7 +241,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     )
     queue, s3_bucket = initialize_aws_services(aws_session)
 
-    await connect_to_mongodb(settings.db_url.get_secret_value(), document_models)
+    await connect_to_mongodb(document_models)
 
     redis_client = initialize_redis_service(settings.redis_host, settings.redis_password.get_secret_value())
 
