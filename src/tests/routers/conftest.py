@@ -27,7 +27,7 @@ async def delete_test_user():
 
 # TODO: Create test client object fixture
 # TODO: break this down into separate functions to avoid re-running user.save()
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture
 async def test_user(request: pytest.FixtureRequest) -> AsyncGenerator[User | UserBase, Any]:
     """Creates a test user object, deleting it post-usage."""
 
