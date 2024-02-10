@@ -25,6 +25,8 @@ async def delete_test_user():
     await User.find_one(User.email == EMAIL).delete()
 
 
+# TODO: Create test client object fixture
+# TODO: break this down into separate functions to avoid re-running user.save()
 @pytest_asyncio.fixture(scope="module")
 async def test_user(request: pytest.FixtureRequest) -> AsyncGenerator[User | UserBase, Any]:
     """Creates a test user object, deleting it post-usage."""
@@ -80,5 +82,7 @@ async def get_login_tokens(request: pytest.FixtureRequest, test_user):
 
     if token_type == "access":
         yield data["access_token"]
-    else:
+    elif token_type == "refresh":
         yield data["refresh_token"]
+    else:
+        yield data

@@ -4,7 +4,6 @@ from src.schemas.web_responses.common import COMMON_RESPONSES
 from src.schemas.web_responses.users import USER_NOT_FOUND_RESPONSE
 
 
-# TODO: add 400 responses
 LOGIN_RESPONSES: dict[int | str, dict[str, Any]] = {
     **COMMON_RESPONSES,
     200: {
