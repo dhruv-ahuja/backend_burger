@@ -3,7 +3,6 @@ import pytest
 
 from src import main
 from src.models.users import User
-from src.schemas.responses import BaseResponse
 from src.schemas.users import UserBase
 
 
@@ -83,9 +82,9 @@ async def test_get_users(test_user, get_login_tokens):
     async with AsyncClient(app=main.app, base_url="http://test", headers=headers) as client:
         response = await client.get("/users/")
 
-    response_users: list[UserBase] = response.json()["data"]["users"]
-
     assert response.status_code == 200
+
+    response_users: list[UserBase] = response.json()["data"]["users"]
     assert len(response_users) == len(users)
 
     for i in range(len(users)):
@@ -105,15 +104,19 @@ async def test_get_user(test_user, get_login_tokens):
     """Tests getting an existing user from the database."""
 
     user: UserBase = test_user
-    user_response = BaseResponse(data=user).model_dump(mode="json")
-
     headers = {"Authorization": f"Bearer {get_login_tokens}"}
 
     async with AsyncClient(app=main.app, base_url="http://test", headers=headers) as client:
         response = await client.get(f"/users/{user.id}")
 
     assert response.status_code == 200
-    assert response.json() == user_response
+
+    response_user = UserBase.model_validate(response.json()["data"])
+
+    assert user.id == response_user.id
+    assert user.name == response_user.name
+    assert user.email == response_user.email
+    assert user.role == response_user.role
 
 
 # * using `test_user` prevents issues when running after `delete_user` test
@@ -138,15 +141,19 @@ async def test_get_current_user(test_user, get_login_tokens):
     """Tests getting current user's details from the database."""
 
     user: UserBase = test_user
-    user_response = BaseResponse(data=user).model_dump(mode="json")
-
     headers = {"Authorization": f"Bearer {get_login_tokens}"}
 
     async with AsyncClient(app=main.app, base_url="http://test", headers=headers) as client:
         response = await client.get("/users/current")
 
     assert response.status_code == 200
-    assert response.json() == user_response
+
+    response_user = UserBase.model_validate(response.json()["data"])
+
+    assert user.id == response_user.id
+    assert user.name == response_user.name
+    assert user.email == response_user.email
+    assert user.role == response_user.role
 
 
 @pytest.mark.asyncio

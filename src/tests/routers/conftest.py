@@ -17,7 +17,7 @@ EMAIL = "test_user_email@email.co.io"
 PASSWORD = "backendBurger123!"
 
 
-@pytest_asyncio.fixture(scope="session", autouse=True)
+@pytest_asyncio.fixture(scope="module", autouse=True)
 async def delete_test_user():
     """Deletes the test user from the database, if it already exists. This prevents any potential 'duplicate user'
     errors during the tests."""
@@ -25,7 +25,7 @@ async def delete_test_user():
     await User.find_one(User.email == EMAIL).delete()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module")
 async def test_user(request: pytest.FixtureRequest) -> AsyncGenerator[User | UserBase, Any]:
     """Creates a test user object, deleting it post-usage."""
 
@@ -42,7 +42,7 @@ async def test_user(request: pytest.FixtureRequest) -> AsyncGenerator[User | Use
     # workaround for the duplicate user object creation error
     try:
         await user.save()  # type: ignore
-    except beanie.exceptions.RevisionIdWasChanged:
+    except (beanie.exceptions.RevisionIdWasChanged, beanie.exceptions.DocumentAlreadyCreated):
         pass
 
     yield_user_base = getattr(request, "param", None)
@@ -63,7 +63,7 @@ async def test_user(request: pytest.FixtureRequest) -> AsyncGenerator[User | Use
     await user.delete()  # type: ignore
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture
 async def get_login_tokens(request: pytest.FixtureRequest, test_user):
     """Logs the test user into the application, getting the access and refresh tokens as response.
     Returns the desired token type."""
