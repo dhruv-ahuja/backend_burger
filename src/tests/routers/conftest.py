@@ -1,3 +1,4 @@
+import asyncio
 from beanie import PydanticObjectId
 import beanie.exceptions
 from httpx import AsyncClient
@@ -7,7 +8,7 @@ import pytest_asyncio
 from typing import Any, AsyncGenerator
 
 from src import main
-from src.models.users import User
+from src.models.users import BlacklistedToken, User
 from src.schemas.users import Role, UserBase
 from src.utils.auth_utils import hash_value
 
@@ -19,12 +20,12 @@ PASSWORD = "backendBurger123!"
 USER_INPUT = {"name": "test_user", "email": EMAIL, "password": PASSWORD}
 
 
-@pytest_asyncio.fixture(scope="module")
+@pytest_asyncio.fixture()
 async def test_client():
     """Initializes and yields the Async test client to test application's endpoints."""
 
-    async with AsyncClient(app=main.app, base_url="http://test") as client:
-        yield client
+    async with AsyncClient(app=main.app, base_url="http://test") as test_client:
+        yield test_client
 
 
 @pytest_asyncio.fixture
@@ -67,14 +68,25 @@ async def get_login_tokens(request: pytest.FixtureRequest, test_user: UserBase, 
     token_type = request.param
     form_data = {"username": EMAIL, "password": PASSWORD}
 
-    response = await test_client.post("/auth/login", data=form_data)
-    assert response.status_code == 200
+    tries = 3
 
-    data: dict[str, str] = response.json()["data"]
+    while tries > 0:
+        response = await test_client.post("/auth/login", data=form_data)
+        assert response.status_code == 200
 
-    if token_type == "access":
-        yield data["access_token"]
-    elif token_type == "refresh":
-        yield data["refresh_token"]
-    else:
-        yield data
+        data: dict[str, str] = response.json()["data"]
+        access_token = data["access_token"]
+
+        blacklisted_token = await BlacklistedToken.find(BlacklistedToken.access_token == access_token).first_or_none()
+        if blacklisted_token is None:
+            if token_type == "access":
+                yield data["access_token"]
+            elif token_type == "refresh":
+                yield data["refresh_token"]
+            else:
+                yield data
+            break
+
+        else:
+            tries -= 1
+            await asyncio.sleep(0.1)
