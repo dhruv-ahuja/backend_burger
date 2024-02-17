@@ -62,10 +62,13 @@ jobs:
             - name: Test code
               continue-on-error: false
               run: 
-                pytest .
+                pytest . -s -v -W ignore
             
             - name: Format and Lint Code with Ruff
               run:
                 ruff format . --line-length=120
                 ruff check . --fix
-                
+            
+            - name: Setup tmate session
+              if: ${{ failure() }}
+              uses: mxschmitt/action-tmate@v3

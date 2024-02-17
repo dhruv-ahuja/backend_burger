@@ -34,9 +34,10 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
             exc_filename = os.path.relpath(exc_filename, start=os.getcwd())
             exc_linenumber = frame[0].f_lineno
 
-            logger.error(
-                f"exception type {exc_type}, object: {exc_object} at file {exc_filename}, line no. {exc_linenumber} when processing request: {exc}"
-            )
+            tracelog = f"exception type {exc_type}, object: {exc_object} at file {exc_filename}, line no. {exc_linenumber} when processing request: {exc}"
+
+            logger.error(tracelog)
+            print(tracelog)
 
             response = BaseResponse(
                 data=None,
