@@ -22,7 +22,6 @@ env:
     S3_BUCKET_NAME: ${{secrets.S3_BUCKET_NAME}}
     S3_LOGS_FOLDER: ${{secrets.S3_LOGS_FOLDER}}
     REDIS_HOST: redis
-    REDIS_PASSWORD: null
 
 jobs:
     build:
