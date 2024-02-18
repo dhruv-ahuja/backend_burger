@@ -3,6 +3,7 @@ name: CD
 on:
     push:
         tags: "v*"
+        branches: main
 
     # allow manually triggering this workflow
     workflow_dispatch: {}
