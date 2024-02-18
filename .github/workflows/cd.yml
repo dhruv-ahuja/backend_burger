@@ -37,11 +37,28 @@ jobs:
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
 
+            - name: Debug Tag
+              run: echo "TAG = ${{steps.meta.outputs.tags}}"
+            
+            - name: 'Get Latest tag'
+              id: latestTag
+              uses: "WyriHaximus/github-action-get-previous-tag@v1"
+              with:
+                fallback: 0.0.1
+            
+            - name: Determine Tag
+              id: determine_tag
+              run: if [[ -z "${{ steps.meta.outputs.tags }}" ]]; then
+                echo "::set-output name=tag::${{ steps.latestTag.outputs.tag }}"; else
+                echo "::set-output name=tag::${{ steps.meta.outputs.tags }}"; fi
+              shell: bash
+
             - name: Build and push docker image
               uses: docker/build-push-action@v5
               with:
                 context: .
                 file: ./Dockerfile
                 push: true
-                tags: ${{steps.meta.outputs.tags}}
+                tags: ${{ steps.determine_tag.outputs.tag }}
+                # tags: ${{steps.meta.outputs.tags}}
                 labels: ${{steps.meta.outputs.labels}}
