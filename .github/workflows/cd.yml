@@ -25,7 +25,7 @@ jobs:
                 username: ${{secrets.DOCKER_USERNAME}}
                 password: ${{secrets.DOCKER_PASSWORD}}
 
-            - name: 'Get Latest tag'
+            - name: Get Latest Tag
               id: latest-tag
               uses: "WyriHaximus/github-action-get-previous-tag@v1"
               with:
