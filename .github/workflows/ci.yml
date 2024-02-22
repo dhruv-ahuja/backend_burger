@@ -63,11 +63,15 @@ jobs:
               run: 
                 pytest . -s -v -W ignore
             
-            - name: Format and Lint Code
+            - name: Check Code Formatting
               run:
-                ruff format . --line-length=120 &&
-                ruff check . --fix
+                ruff format --line-length=120 --check . 
+            
+            - name: Check Code Linting
+              run: 
+                ruff check .
             
             - name: Setup Tmate Session
               if: ${{ failure() }}
               uses: mxschmitt/action-tmate@v3
+              
