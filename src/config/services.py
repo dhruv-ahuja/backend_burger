@@ -274,10 +274,3 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 settings = generate_settings_config()
 # initialize global client object for use across app
 db_client = AsyncIOMotorClient(settings.db_url.get_secret_value())
-
-
-from src import *
-
-
-
-
