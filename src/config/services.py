@@ -186,18 +186,24 @@ def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) 
     return s3_bucket
 
 
-def initialize_aws_services(aws_session: boto3.Session) -> t.Tuple[Queue, Bucket]:
+def initialize_aws_services(
+    aws_session: boto3.Session, init_queue: bool = True, init_s3: bool = True
+) -> t.Tuple[Queue | None, Bucket | None]:
     """Connects to all AWS services and returns AWS re-usable instances. Gathers all AWS services' initialization
     function calls in one place."""
+
+    queue = bucket = None
 
     cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
     initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
 
-    sqs_client = get_aws_service(AwsService.SQS, aws_session)
-    queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
+    if init_queue:
+        sqs_client = get_aws_service(AwsService.SQS, aws_session)
+        queue = get_sqs_queue(sqs_client, app.PROJECT_NAME)
 
-    s3 = get_aws_service(AwsService.S3, aws_session)
-    bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
+    if init_s3:
+        s3 = get_aws_service(AwsService.S3, aws_session)
+        bucket = get_s3_bucket(s3, app.S3_BUCKET_NAME)
 
     return (queue, bucket)
 
@@ -239,7 +245,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
         settings.aws_access_secret.get_secret_value(),
         settings.aws_region_name,
     )
-    queue, s3_bucket = initialize_aws_services(aws_session)
+    queue, s3_bucket = initialize_aws_services(aws_session, False)
 
     await connect_to_mongodb(document_models)
 
@@ -251,7 +257,10 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
     async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()
-    jobs.schedule_logs_upload_job(s3_bucket, scheduler)
+    if s3_bucket is not None:
+        jobs.schedule_logs_upload_job(s3_bucket, scheduler)
+    else:
+        logger.info("skipped scheduling, s3 connection was skipped")
 
     delete_older_than = dt.datetime.utcnow() - dt.timedelta(days=1)
     jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
