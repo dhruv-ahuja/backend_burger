@@ -240,6 +240,8 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     path = pathlib.Path(logs.LOGS_DIRECTORY)
     initialize_logger(logs.LOGGER_MESSAGE_FORMAT, path, logs.LOGGER_FILENAME_FORMAT)
 
+    logger.debug("application startup, setting up services")
+
     aws_session = initialize_aws_session(
         settings.aws_access_key.get_secret_value(),
         settings.aws_access_secret.get_secret_value(),
@@ -274,7 +276,11 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     app_.state.redis = redis_client
     app_.state.scheduler = scheduler
 
+    logger.debug("invoked services, yielding to the application")
+
     yield
+
+    logger.debug("tearing down and cleaning memory for application shutdown")
 
     scheduler.shutdown()
     async_scheduler.shutdown()
