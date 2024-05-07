@@ -195,7 +195,7 @@ def initialize_aws_services(
     queue = bucket = None
 
     cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
-    initialize_cloudwatch_handler(cloudwatch_client, app.PROJECT_NAME, app.PROJECT_NAME)
+    initialize_cloudwatch_handler(cloudwatch_client, app.LOG_GROUP_NAME, app.PROJECT_NAME)
 
     if init_queue:
         sqs_client = get_aws_service(AwsService.SQS, aws_session)

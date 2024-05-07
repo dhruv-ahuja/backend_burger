@@ -4,6 +4,7 @@ import datetime as dt
 PROJECT_NAME = "backend_burger"
 S3_BUCKET_NAME = "backend-burger"
 S3_FOLDER_NAME = "logs"
+LOG_GROUP_NAME = "backend_burger_logs"
 
 UNIQUE_APP_ID = uuid4().hex[:10]
 
