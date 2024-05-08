@@ -1,7 +1,7 @@
 import datetime as dt
 from decimal import Decimal
 
-from beanie import Document, Link, Replace, SaveChanges, Update, after_event
+from beanie import Document, Link, Replace, SaveChanges, Update, ValidateOnSave, after_event
 from pydantic import Field
 
 from src.schemas.poe import Currency
@@ -18,7 +18,7 @@ class ItemCategory(Document):
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
 
-    @after_event(Replace, SaveChanges, Update)
+    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
     def update_time(self):
         self.updated_time = dt.datetime.now()
 
@@ -35,7 +35,7 @@ class ItemGroup(Document):
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
 
-    @after_event(Replace, SaveChanges, Update)
+    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
     def update_time(self):
         self.updated_time = dt.datetime.now()
 
@@ -56,8 +56,9 @@ class Item(Document):
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
 
-    @after_event(Replace, SaveChanges, Update)
+    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
     def update_time(self):
+        print(f"UPDATING TIME FOR {self}")
         self.updated_time = dt.datetime.now()
 
     class Settings:
@@ -80,7 +81,7 @@ class ItemPrice(Document):
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
 
-    @after_event(Replace, SaveChanges, Update)
+    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
     def update_time(self):
         self.updated_time = dt.datetime.now()
 
