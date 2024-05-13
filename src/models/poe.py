@@ -28,30 +28,14 @@ class ItemCategory(Document):
         name = "poe_item_categories"
 
 
-class ItemGroup(Document):
-    """ItemGroup represents a group that items fall under. These are more specific than item categories."""
-
-    name: str
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
-    def update_time(self):
-        self.updated_time = dt.datetime.now()
-
-    class Settings:
-        """Defines the settings for the collection."""
-
-        name = "poe_item_groups"
-
-
 class Item(Document):
-    """Item represents a Path of Exile in-game item."""
+    """Item represents a Path of Exile in-game item. Each item belongs to a category."""
 
     poe_ninja_id: str
     name: str
     category: Link[ItemCategory]
-    group: Link[ItemGroup]
+    type_: str = Field(serialization_alias="type")
+    variant: str | None = None
     enabled: bool = True
     created_time: dt.datetime = Field(default_factory=dt.datetime.now)
     updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
