@@ -1,10 +1,16 @@
 import asyncio
 from dataclasses import dataclass
+import json
+import os
+import time
+from typing import Any
 
+from httpx import AsyncClient, Client
+from loguru import logger
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
-from src.models.poe import Item, ItemCategory, ItemGroup, ItemPrice
+from src.models.poe import Item, ItemCategory, ItemPrice
 
 
 @dataclass
@@ -66,9 +72,44 @@ async def save_update_categories():
             await ItemCategory.save(item_category)
 
 
+def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]):
+    base_path = f"itemData/{group}"
+    file_path = f"{base_path}/{category_name}.json"
+
+    if os.path.exists(file_path):
+        logger.info(f"{file_path} exists, skipping...")
+        return
+
+    os.makedirs(f"{base_path}", exist_ok=True)
+
+    with open(file_path, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+async def get_and_map_data() -> dict[str, list[dict]]:
+    category_items_mapping = {}
+
+    async with AsyncClient(base_url="https://poe.ninja/api/data") as client:
+        for _, categories in CATEGORY_GROUP_MAP.items():
+            for category in categories:
+                internal_category_name = category.internal_name
+                category_name = category.name
+
+                res = await client.get(f"/itemoverview?league=Necropolis&type={category.internal_name}")
+                logger.debug(f"category: {internal_category_name}, status_code: {res.status_code}")
+
+                data: list[dict] = res.json()["lines"]
+                category_items_mapping[category_name] = data
+
+                time.sleep(0.1)
+
+    return category_items_mapping
+
+
 async def main():
     await connect_to_mongodb(document_models)
-    await save_update_categories()
+    # await save_update_categories()
+    category_items_mapping = await get_and_map_data()
 
 
 if __name__ == "__main__":
