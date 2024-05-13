@@ -52,7 +52,7 @@ CATEGORY_GROUP_MAP = {
         Category("Base Types", "BaseType"),
         Category("Fossils", "Fossil"),
         Category("Resonators", "Resonator"),
-        Category("Beasts", "Beasts"),
+        Category("Beasts", "Beast"),
         Category("Essences", "Essence"),
         Category("Vials", "Vial"),
     ],
