@@ -3,6 +3,8 @@ name: CI
 on:
     push:
         branches: main
+    pull_request:
+        branches: main
     
     # allow manually triggering this workflow
     workflow_dispatch: {}
