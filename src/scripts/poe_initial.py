@@ -3,14 +3,16 @@ from dataclasses import dataclass
 import json
 import os
 import time
-from typing import Any
+from typing import Any, cast
 
-from httpx import AsyncClient, Client
+from httpx import AsyncClient
 from loguru import logger
+from pydantic import BaseModel, Field
+import pydantic
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
-from src.models.poe import Item, ItemCategory, ItemPrice
+from src.models.poe import Item, ItemCategory, ItemIdType
 
 
 @dataclass
@@ -18,6 +20,28 @@ class Category:
     name: str
     internal_name: str
     enabled: bool = True
+
+
+# * these encapsulate required currency and item data for each entry from API responses
+class CurrencyItemEntity(BaseModel):
+    class Pay(BaseModel):
+        pay_currency_id: int
+
+    class Receive(BaseModel):
+        get_currency_id: int
+
+    currencyTypeName: str
+    pay: Pay | None = None
+    receive: Receive | None = None
+
+
+class ItemEntity(BaseModel):
+    id_: int = Field(alias="id")
+    name: str
+    baseType: str
+    variant: str | None = None
+    icon: str
+    itemType: str
 
 
 CATEGORY_GROUP_MAP = {
@@ -64,6 +88,13 @@ CATEGORY_GROUP_MAP = {
     ],
 }
 
+CATEGORY_GROUP_API_URL_MAP = {
+    "Currency": "currencyOverview",
+    "EquipmentAndGems": "itemOverview",
+    "Atlas": "itemOverview",
+    "Crafting": "currencyOverview",
+}
+
 
 async def save_update_categories():
     for group, categories in CATEGORY_GROUP_MAP.items():
@@ -86,8 +117,9 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def get_and_map_data() -> dict[str, list[dict]]:
-    category_items_mapping = {}
+async def get_item_data() -> dict[str, list[dict]]:
+    category_item_mapping = {}
+    # breakpoint()
 
     async with AsyncClient(base_url="https://poe.ninja/api/data") as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
@@ -95,21 +127,101 @@ async def get_and_map_data() -> dict[str, list[dict]]:
                 internal_category_name = category.internal_name
                 category_name = category.name
 
-                res = await client.get(f"/itemoverview?league=Necropolis&type={category.internal_name}")
+                api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
+                url = f"/{api_endpoint}?league=Necropolis&type={category.internal_name}"
+                print(url)
+                res = await client.get(url)
                 logger.debug(f"category: {internal_category_name}, status_code: {res.status_code}")
 
-                data: list[dict] = res.json()["lines"]
-                category_items_mapping[category_name] = data
+                # TODO: parse and pass currency icons separately
+                item_data: list[dict] = res.json()["lines"]
+                category_item_mapping[category_name] = item_data
 
                 time.sleep(0.1)
+                break
 
-    return category_items_mapping
+    return category_item_mapping
+
+
+# TODO: create asyncio tasks and divide categories' data into separate threads for concurrent insertions;
+# TODO: divide Base Types into several tasks due to large size (~20k)
+async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
+    logger.debug("starting to save item data in DB")
+    # TODO: use transaction here!!
+    for category, item_data in category_item_mapping.items():
+        start = time.perf_counter()
+
+        category_record = await ItemCategory.find(ItemCategory.name == category).first_or_none()
+        if category_record is None:
+            logger.error(f"DB record for {category} wasn't found!")
+            continue
+
+        is_currency = category == "Currency"
+
+        for entity in item_data:
+            try:
+                if is_currency:
+                    item_entity = CurrencyItemEntity(**entity)
+                else:
+                    item_entity = ItemEntity(**entity)
+
+            except pydantic.ValidationError as exc:
+                if is_currency:
+                    name = entity["currencyTypeName"]
+                    item_type = "currency"
+                else:
+                    name = entity["name"]
+                    item_type = "item"
+
+                logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+                continue
+
+            if is_currency:
+                item_entity = cast(CurrencyItemEntity, item_entity)
+                id_type = None
+
+                if item_entity.pay is not None:
+                    poe_ninja_id = item_entity.pay.pay_currency_id
+                    id_type = ItemIdType.pay
+                elif item_entity.receive is not None:
+                    poe_ninja_id = item_entity.receive.get_currency_id
+                    id_type = ItemIdType.receive
+                else:
+                    logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
+                    continue
+
+                item_record = Item(
+                    poe_ninja_id=poe_ninja_id,
+                    id_type=id_type,
+                    name=item_entity.currencyTypeName,
+                    category=category_record,  # type: ignore
+                    type_=None,
+                )
+
+            else:
+                item_entity = cast(ItemEntity, item_entity)
+                item_record = Item(
+                    poe_ninja_id=item_entity.id_,
+                    name=item_entity.name,
+                    type_=item_entity.itemType,
+                    category=category_record,  # type: ignore
+                    icon_url=item_entity.icon,
+                    variant=item_entity.variant,
+                )
+
+            await item_record.save()  # type: ignore
+
+        stop = time.perf_counter()
+        logger.debug(f"time taken for category: {category}: {stop - start}")
+
+    logger.debug("saved item data to DB")
 
 
 async def main():
     await connect_to_mongodb(document_models)
-    # await save_update_categories()
-    category_items_mapping = await get_and_map_data()
+    await save_update_categories()
+    category_items_mapping = await get_item_data()
+    await save_item_data(category_items_mapping)
 
 
 if __name__ == "__main__":
