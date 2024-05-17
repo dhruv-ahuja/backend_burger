@@ -41,7 +41,7 @@ class ItemEntity(BaseModel):
     baseType: str
     variant: str | None = None
     icon: str
-    itemType: str
+    itemType: str | None = None
 
 
 CATEGORY_GROUP_MAP = {
