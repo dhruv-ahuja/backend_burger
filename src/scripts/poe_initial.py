@@ -147,8 +147,10 @@ async def get_item_data() -> dict[str, list[dict]]:
 async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
     logger.debug("starting to save item data in DB")
     # TODO: use transaction here!!
+    total_time = 0
     for category, item_data in category_item_mapping.items():
         start = time.perf_counter()
+        logger.debug(f"serializing data for {category}")
 
         category_record = await ItemCategory.find(ItemCategory.name == category).first_or_none()
         if category_record is None:
@@ -211,9 +213,12 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
             await item_record.save()  # type: ignore
 
         stop = time.perf_counter()
-        logger.debug(f"time taken for category: {category}: {stop - start}")
+        execution_time = stop - start
 
-    logger.debug("saved item data to DB")
+        total_time += execution_time
+        logger.debug(f"time taken for category: {category}: {execution_time}")
+
+    logger.debug(f"saved item data to DB, total time taken: {total_time}")
 
 
 async def main():
