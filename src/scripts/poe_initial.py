@@ -119,7 +119,6 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
 
 async def get_item_data() -> dict[str, list[dict]]:
     category_item_mapping = {}
-    # breakpoint()
 
     async with AsyncClient(base_url="https://poe.ninja/api/data") as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
@@ -127,9 +126,10 @@ async def get_item_data() -> dict[str, list[dict]]:
                 internal_category_name = category.internal_name
                 category_name = category.name
 
+                logger.debug(f"fetching data for {category_name}")
+
                 api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
                 url = f"/{api_endpoint}?league=Necropolis&type={category.internal_name}"
-                print(url)
                 res = await client.get(url)
                 logger.debug(f"category: {internal_category_name}, status_code: {res.status_code}")
 
@@ -138,7 +138,6 @@ async def get_item_data() -> dict[str, list[dict]]:
                 category_item_mapping[category_name] = item_data
 
                 time.sleep(0.1)
-                break
 
     return category_item_mapping
 
