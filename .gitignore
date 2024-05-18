@@ -129,4 +129,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 .DS_Store
+
+# AWS deployment env vars
 backend_burger_aws.env
+
+# poe data
+itemData/
