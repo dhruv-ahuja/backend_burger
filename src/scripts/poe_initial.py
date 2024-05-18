@@ -68,8 +68,8 @@ CATEGORY_GROUP_MAP = {
         Category("Cluster Jewels", "ClusterJewel"),
     ],
     "Atlas": [
-        Category("Maps", "UniqueWeapon"),
-        Category("Blighted Maps", "UniqueArmour"),
+        Category("Maps", "Map"),
+        Category("Blighted Maps", "BlightedMap"),
         Category("Blight-ravaged Maps", "BlightRavagedMap"),
         Category("Scourged Maps", "ScourgedMap"),
         Category("Unique Maps", "UniqueMap"),
