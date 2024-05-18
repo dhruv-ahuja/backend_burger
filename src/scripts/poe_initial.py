@@ -5,7 +5,7 @@ import os
 import time
 from typing import Any, cast
 
-from httpx import AsyncClient, Client
+from httpx import AsyncClient
 from loguru import logger
 from pydantic import BaseModel, Field
 import pydantic
