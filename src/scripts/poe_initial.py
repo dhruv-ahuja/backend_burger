@@ -5,7 +5,7 @@ import os
 import time
 from typing import Any, cast
 
-from httpx import AsyncClient
+from httpx import AsyncClient, Client
 from loguru import logger
 from pydantic import BaseModel, Field
 import pydantic
@@ -68,8 +68,8 @@ CATEGORY_GROUP_MAP = {
         Category("Cluster Jewels", "ClusterJewel"),
     ],
     "Atlas": [
-        Category("Maps", "UniqueWeapon"),
-        Category("Blighted Maps", "UniqueArmour"),
+        Category("Maps", "Map"),
+        Category("Blighted Maps", "BlightedMap"),
         Category("Blight-ravaged Maps", "BlightRavagedMap"),
         Category("Scourged Maps", "ScourgedMap"),
         Category("Unique Maps", "UniqueMap"),
@@ -159,7 +159,7 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
 
         is_currency = category == "Currency"
 
-        for entity in item_data:
+        for entity in item_data[:10000]:
             try:
                 if is_currency:
                     item_entity = CurrencyItemEntity(**entity)
