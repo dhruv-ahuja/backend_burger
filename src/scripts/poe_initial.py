@@ -146,8 +146,8 @@ async def get_item_data() -> dict[str, list[dict]]:
 # TODO: divide Base Types into several tasks due to large size (~20k)
 async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
     logger.debug("starting to save item data in DB")
-    # TODO: use transaction here!!
-    total_time = 0
+    items = []
+
     for category, item_data in category_item_mapping.items():
         start = time.perf_counter()
         logger.debug(f"serializing data for {category}")
@@ -210,15 +210,13 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
                     variant=item_entity.variant,
                 )
 
-            await item_record.save()  # type: ignore
+            items.append(item_record)
 
-        stop = time.perf_counter()
-        execution_time = stop - start
+    await Item.insert_many(items)
+    stop = time.perf_counter()
+    execution_time = stop - start
 
-        total_time += execution_time
-        logger.debug(f"time taken for category: {category}: {execution_time}")
-
-    logger.debug(f"saved item data to DB, total time taken: {total_time}")
+    logger.debug(f"time taken for category: {category}: {execution_time}")
 
 
 async def main():
