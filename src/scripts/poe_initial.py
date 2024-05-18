@@ -159,7 +159,7 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
 
         is_currency = category == "Currency"
 
-        for entity in item_data[:10000]:
+        for entity in item_data:
             try:
                 if is_currency:
                     item_entity = CurrencyItemEntity(**entity)
