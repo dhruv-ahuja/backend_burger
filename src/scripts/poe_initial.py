@@ -1,11 +1,12 @@
 import asyncio
+from asyncio import Queue
 from dataclasses import dataclass
 import json
 import os
 import time
 from typing import Any, cast
 
-from httpx import AsyncClient
+from httpx import AsyncClient, RequestError
 from loguru import logger
 from pydantic import BaseModel, Field
 import pydantic
@@ -96,7 +97,13 @@ CATEGORY_GROUP_API_URL_MAP = {
 }
 
 
-async def save_update_categories():
+API_BASE_URL = "https://poe.ninja/api/data"
+
+
+async def save_item_categories():
+    """Iterates over the nested category group hashmap and Saves information for individual item categories into the
+    database."""
+
     for group, categories in CATEGORY_GROUP_MAP.items():
         for category in categories:
             item_category = ItemCategory(name=category.name, internal_name=category.internal_name, group=group)
@@ -104,6 +111,8 @@ async def save_update_categories():
 
 
 def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]):
+    """Writes item API data to disk, using the group and category names to define the JSON file path."""
+
     base_path = f"itemData/{group}"
     file_path = f"{base_path}/{category_name}.json"
 
@@ -117,29 +126,127 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def get_item_data() -> dict[str, list[dict]]:
-    category_item_mapping = {}
-
-    async with AsyncClient(base_url="https://poe.ninja/api/data") as client:
+async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]], item_data_queue: Queue[Item]):
+    async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
             for category in categories:
                 internal_category_name = category.internal_name
                 category_name = category.name
 
-                logger.debug(f"fetching data for {category_name}")
+                category_record = await get_category_by_name(category_name)
+                if category_record is None:
+                    logger.error(f"DB record for {category.name} wasn't found, skipping process!")
+                    continue
 
-                api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
-                url = f"/{api_endpoint}?league=Necropolis&type={category.internal_name}"
-                res = await client.get(url)
-                logger.debug(f"category: {internal_category_name}, status_code: {res.status_code}")
+                logger.debug(f"getting api data for {category_name}")
+                api_item_data = await get_item_api_data(internal_category_name, client)
 
-                # TODO: parse and pass currency icons separately
-                item_data: list[dict] = res.json()["lines"]
-                category_item_mapping[category_name] = item_data
+                api_item_data_payload = (category_record, api_item_data)
+                await api_item_data_queue.put(api_item_data_payload)
 
-                time.sleep(0.1)
+                logger.debug(f"pushed api data for {category_name}; {api_item_data_payload[1][:2]}")
 
-    return category_item_mapping
+                await parse_api_item_data(api_item_data_queue, item_data_queue)
+
+
+async def get_category_by_name(name: str) -> ItemCategory | None:
+    """Gets an `ItemCategory` document from the database by its name."""
+
+    try:
+        category_record = await ItemCategory.find(ItemCategory.name == name).first_or_none()
+    except Exception as exc:
+        logger.error(f"error getting category by name '{name}': {exc} ")
+        return
+
+    return category_record
+
+
+async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> list[dict[str, Any]]:
+    """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
+    endpoint, then parsing and returning the item data for the category."""
+
+    api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
+    url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
+
+    try:
+        response = await client.get(url)
+        logger.debug(f"category: {internal_category_name}, status_code: {response.status_code}")
+    except RequestError as exc:
+        logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
+        item_data = []
+    else:
+        # TODO: parse and pass currency icons separately
+        item_data: list[dict] = response.json()["lines"]
+
+    return item_data
+
+
+# TODO: this should run concurrently with the other tasks
+async def parse_api_item_data(
+    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]], item_data_queue: Queue[Item]
+) -> None:
+    """Fetches item API data from the respective queue, and parses it into apt Pydantic model instances, hence
+    structuring each item in the list and validating its values.
+    Pushes the structured data records to the item data queue once done."""
+
+    category_record, api_item_data = await api_item_data_queue.get()
+
+    category_name = category_record.name
+    category_internal_name = category_record.internal_name
+
+    is_currency = category_internal_name == "Currency"
+    logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
+
+    for api_item_entity in api_item_data:
+        try:
+            item_entity = CurrencyItemEntity(**api_item_entity) if is_currency else ItemEntity(**api_item_entity)
+        except pydantic.ValidationError as exc:
+            if is_currency:
+                name = api_item_entity.get("currencyTypeName")
+                item_type = "currency"
+            else:
+                name = api_item_entity.get("name")
+                item_type = "item"
+
+            logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+            continue
+
+        if is_currency:
+            item_entity = cast(CurrencyItemEntity, item_entity)
+            id_type = None
+
+            if item_entity.pay is not None:
+                poe_ninja_id = item_entity.pay.pay_currency_id
+                id_type = ItemIdType.pay
+            elif item_entity.receive is not None:
+                poe_ninja_id = item_entity.receive.get_currency_id
+                id_type = ItemIdType.receive
+            else:
+                logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
+                continue
+
+            item_record = Item(
+                poe_ninja_id=poe_ninja_id,
+                id_type=id_type,
+                name=item_entity.currencyTypeName,
+                category=category_record,  # type: ignore
+                type_=None,
+            )
+
+        else:
+            item_entity = cast(ItemEntity, item_entity)
+            item_record = Item(
+                poe_ninja_id=item_entity.id_,
+                name=item_entity.name,
+                type_=item_entity.itemType,
+                category=category_record,  # type: ignore
+                icon_url=item_entity.icon,
+                variant=item_entity.variant,
+            )
+
+        await item_data_queue.put(item_record)
+
+    logger.debug(f"parsed all entities for {category_name}")
 
 
 # TODO: create asyncio tasks and divide categories' data into separate threads for concurrent insertions;
@@ -221,9 +328,14 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
 
 async def main():
     await connect_to_mongodb(document_models)
-    await save_update_categories()
-    category_items_mapping = await get_item_data()
-    await save_item_data(category_items_mapping)
+    await save_item_categories()
+
+    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]] = Queue()
+    item_data_queue: Queue[Item] = Queue()  # TODO: add queue size limit
+
+    await prepare_api_data(api_item_data_queue, item_data_queue)
+
+    # await save_item_data(category_items_mapping)
 
 
 if __name__ == "__main__":
