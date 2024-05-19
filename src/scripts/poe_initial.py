@@ -99,6 +99,8 @@ CATEGORY_GROUP_API_URL_MAP = {
 
 API_BASE_URL = "https://poe.ninja/api/data"
 
+BATCH_INSERT_LIMIT = 15_000
+
 
 async def save_item_categories():
     """Iterates over the nested category group hashmap and Saves information for individual item categories into the
@@ -126,7 +128,10 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]], item_data_queue: Queue[Item]):
+async def prepare_api_data(
+    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
+):
+    start = time.perf_counter()
     async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
             for category in categories:
@@ -144,9 +149,13 @@ async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, list[d
                 api_item_data_payload = (category_record, api_item_data)
                 await api_item_data_queue.put(api_item_data_payload)
 
-                logger.debug(f"pushed api data for {category_name}; {api_item_data_payload[1][:2]}")
+                logger.debug(f"pushed api data for {category_name}")
 
-                await parse_api_item_data(api_item_data_queue, item_data_queue)
+        # push sentinel value to indicate end of production
+        await api_item_data_queue.put(None)
+
+    stop = time.perf_counter()
+    logger.info(f"total execution time for preparing api data: {stop - start}")
 
 
 async def get_category_by_name(name: str) -> ItemCategory | None:
@@ -181,104 +190,41 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     return item_data
 
 
-# TODO: this should run concurrently with the other tasks
 async def parse_api_item_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]], item_data_queue: Queue[Item]
+    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
 ) -> None:
     """Fetches item API data from the respective queue, and parses it into apt Pydantic model instances, hence
     structuring each item in the list and validating its values.
     Pushes the structured data records to the item data queue once done."""
 
-    category_record, api_item_data = await api_item_data_queue.get()
+    item_records: list[Item] = []
 
-    category_name = category_record.name
-    category_internal_name = category_record.internal_name
+    start = time.perf_counter()
+    while True:
+        api_item_data_payload = await api_item_data_queue.get()
 
-    is_currency = category_internal_name == "Currency"
-    logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
+        if api_item_data_payload is None:
+            # no more data to process, push current item data, sentinel value and exit
+            await item_data_queue.put(item_records)
+            await item_data_queue.put(None)
+            break
 
-    for api_item_entity in api_item_data:
-        try:
-            item_entity = CurrencyItemEntity(**api_item_entity) if is_currency else ItemEntity(**api_item_entity)
-        except pydantic.ValidationError as exc:
-            if is_currency:
-                name = api_item_entity.get("currencyTypeName")
-                item_type = "currency"
-            else:
-                name = api_item_entity.get("name")
-                item_type = "item"
+        category_record, api_item_data = api_item_data_payload
+        category_name = category_record.name
+        category_internal_name = category_record.internal_name
 
-            logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
-            continue
+        is_currency = category_internal_name == "Currency"
+        logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
 
-        if is_currency:
-            item_entity = cast(CurrencyItemEntity, item_entity)
-            id_type = None
-
-            if item_entity.pay is not None:
-                poe_ninja_id = item_entity.pay.pay_currency_id
-                id_type = ItemIdType.pay
-            elif item_entity.receive is not None:
-                poe_ninja_id = item_entity.receive.get_currency_id
-                id_type = ItemIdType.receive
-            else:
-                logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
-                continue
-
-            item_record = Item(
-                poe_ninja_id=poe_ninja_id,
-                id_type=id_type,
-                name=item_entity.currencyTypeName,
-                category=category_record,  # type: ignore
-                type_=None,
-            )
-
-        else:
-            item_entity = cast(ItemEntity, item_entity)
-            item_record = Item(
-                poe_ninja_id=item_entity.id_,
-                name=item_entity.name,
-                type_=item_entity.itemType,
-                category=category_record,  # type: ignore
-                icon_url=item_entity.icon,
-                variant=item_entity.variant,
-            )
-
-        await item_data_queue.put(item_record)
-
-    logger.debug(f"parsed all entities for {category_name}")
-
-
-# TODO: create asyncio tasks and divide categories' data into separate threads for concurrent insertions;
-# TODO: divide Base Types into several tasks due to large size (~20k)
-async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
-    logger.debug("starting to save item data in DB")
-    items = []
-
-    for category, item_data in category_item_mapping.items():
-        start = time.perf_counter()
-        logger.debug(f"serializing data for {category}")
-
-        category_record = await ItemCategory.find(ItemCategory.name == category).first_or_none()
-        if category_record is None:
-            logger.error(f"DB record for {category} wasn't found!")
-            continue
-
-        is_currency = category == "Currency"
-
-        for entity in item_data:
+        for api_item_entity in api_item_data:
             try:
-                if is_currency:
-                    item_entity = CurrencyItemEntity(**entity)
-                else:
-                    item_entity = ItemEntity(**entity)
-
+                item_entity = CurrencyItemEntity(**api_item_entity) if is_currency else ItemEntity(**api_item_entity)
             except pydantic.ValidationError as exc:
                 if is_currency:
-                    name = entity["currencyTypeName"]
+                    name = api_item_entity.get("currencyTypeName")
                     item_type = "currency"
                 else:
-                    name = entity["name"]
+                    name = api_item_entity.get("name")
                     item_type = "item"
 
                 logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
@@ -317,25 +263,69 @@ async def save_item_data(category_item_mapping: dict[str, list[dict]]) -> None:
                     variant=item_entity.variant,
                 )
 
-            items.append(item_record)
+            item_records.append(item_record)
 
-    await Item.insert_many(items)
+            # push this batch of item records and reset the list container
+            if len(item_records) >= BATCH_INSERT_LIMIT:
+                await item_data_queue.put(item_records)
+                item_records = []
+
+        logger.debug(f"parsed all entities for {category_name}")
+
     stop = time.perf_counter()
-    execution_time = stop - start
+    logger.info(f"total execution time for parsing api data: {stop - start}")
 
-    logger.debug(f"time taken for category: {category}: {execution_time}")
+
+async def save_items(item_records: list[Item]) -> bool:
+    """Saves a list of Item records to the database."""
+
+    try:
+        await Item.insert_many(item_records)
+    except Exception as exc:
+        logger.error(f"error saving item records to DB: {exc}")
+        return False
+
+    return True
+
+
+async def save_item_data(item_data_queue: Queue[list[Item] | None]) -> None:
+    """Gets item records in bulk from the item data queue and saves them to the database."""
+
+    batch_save_count = 1
+    logger.debug("initiating saving items to DB")
+
+    start = time.perf_counter()
+    while True:
+        item_records = await item_data_queue.get()
+        if item_records is None:
+            logger.debug("consumer received exit signal")
+            break
+
+        logger.debug(f"saving batch {batch_save_count} of items to DB")
+        save_was_success = await save_items(item_records)
+
+        if save_was_success:
+            logger.debug(f"successfully saved batch {batch_save_count} of items to DB")
+        else:
+            logger.debug(f"failed to save batch {batch_save_count} of items to DB")
+
+        batch_save_count += 1
+
+    stop = time.perf_counter()
+    logger.info(f"time taken to save all records to DB: {stop - start}")
 
 
 async def main():
     await connect_to_mongodb(document_models)
     await save_item_categories()
 
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]]] = Queue()
-    item_data_queue: Queue[Item] = Queue()  # TODO: add queue size limit
+    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None] = Queue()
+    item_data_queue: Queue[list[Item] | None] = Queue()
 
-    await prepare_api_data(api_item_data_queue, item_data_queue)
-
-    # await save_item_data(category_items_mapping)
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(prepare_api_data(api_item_data_queue, item_data_queue))
+        tg.create_task(parse_api_item_data(api_item_data_queue, item_data_queue))
+        tg.create_task(save_item_data(item_data_queue))
 
 
 if __name__ == "__main__":
