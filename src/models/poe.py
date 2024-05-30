@@ -1,12 +1,10 @@
-import datetime as dt
-from decimal import Decimal
 from enum import Enum
 
 from beanie import Link
 from pydantic import Field
 
 from src.models.common import DateMetadataDocument
-from src.schemas.poe import Currency
+from src.schemas.poe import ItemPrice
 
 
 class ItemIdType(str, Enum):
@@ -29,12 +27,14 @@ class ItemCategory(DateMetadataDocument):
 
 
 class Item(DateMetadataDocument):
-    """Item represents a Path of Exile in-game item. Each item belongs to a category."""
+    """Item represents a Path of Exile in-game item. Each item belongs to a category. It contains information such as
+    item type and the current, past and predicted pricing, encapsulated in the `ItemPrice` schema."""
 
     poe_ninja_id: int
     id_type: ItemIdType | None = None
     name: str
     category: Link[ItemCategory]
+    price: ItemPrice | None
     type_: str | None = Field(None, serialization_alias="type")
     variant: str | None = None
     icon_url: str | None = None
@@ -44,21 +44,3 @@ class Item(DateMetadataDocument):
         """Defines the settings for the collection."""
 
         name = "poe_items"
-
-
-class ItemPrice(DateMetadataDocument):
-    """ItemPrice holds information regarding the current, past and future price of an item.
-    It stores the recent and predicted prices in a dictionary, with the date as the key."""
-
-    item: Link[Item]
-    price: Decimal
-    currency: Currency
-    price_history: dict[dt.datetime, Decimal]
-    price_history_currency: Currency
-    price_prediction: dict[dt.datetime, Decimal]
-    price_prediction_currency: Currency
-
-    class Settings:
-        """Defines the settings for the collection."""
-
-        name = "poe_item_prices"
