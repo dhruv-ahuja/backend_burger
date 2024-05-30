@@ -6,6 +6,7 @@ from beanie import PydanticObjectId
 from pydantic import BaseModel, EmailStr, Field, SecretStr, validator
 
 from src.config.constants.app import PASSWORD_REGEX
+from src.models.common import DateMetadataDocument
 
 
 class Role(str, Enum):
@@ -39,7 +40,7 @@ class UserUpdateInput(BaseModel):
     email: EmailStr
 
 
-class UserBase(BaseModel):
+class UserBase(DateMetadataDocument):
     """UserBase is the base user model, representing User instances for API responses. Omits the
     password field for security."""
 
@@ -47,13 +48,10 @@ class UserBase(BaseModel):
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     role: Role
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
 
 
-class UserSession(BaseModel):
+class UserSession(DateMetadataDocument):
     """UserSession encapsulates the user's session logic."""
 
     refresh_token: str | None
     expiration_time: dt.datetime | None
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
