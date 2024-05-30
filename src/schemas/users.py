@@ -40,13 +40,21 @@ class UserUpdateInput(BaseModel):
 
 
 class UserBase(BaseModel):
-    """UserBase is the base user model, representing User instances for API responses. Omits the
-    password field for security."""
+    """UserBase is the base user model, encapsulating core-User instance data. Omits the password field for
+    security."""
 
     id: PydanticObjectId | None = None
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     role: Role
+
+
+class UserBaseResponse(UserBase):
+    """UserBaseResponse extends UserBase and includes the created and updated datetime fields, for User API
+    responses."""
+
+    created_time: dt.datetime
+    updated_time: dt.datetime
 
 
 class UserSession(BaseModel):

@@ -9,7 +9,7 @@ from typing import Any, AsyncGenerator
 
 from src import main
 from src.models.users import BlacklistedToken, User
-from src.schemas.users import Role, UserBase
+from src.schemas.users import Role, UserBase, UserBaseResponse
 from src.utils.auth_utils import hash_value
 
 
@@ -46,7 +46,7 @@ async def test_user() -> AsyncGenerator[User | UserBase, Any]:
     except (beanie.exceptions.RevisionIdWasChanged, beanie.exceptions.DocumentAlreadyCreated):
         pass
 
-    user_base = UserBase(
+    user_base = UserBaseResponse(
         id=user.id,
         name="backend_burger_test",
         email=EMAIL,
