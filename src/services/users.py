@@ -10,7 +10,7 @@ from pymongo.errors import DuplicateKeyError
 from starlette.status import HTTP_400_BAD_REQUEST, HTTP_404_NOT_FOUND
 
 from src.models.users import User
-from src.schemas.users import Role, UserBase, UserInput, UserUpdateInput
+from src.schemas.users import Role, UserBase, UserBaseResponse, UserInput, UserUpdateInput
 from src.utils import auth_utils
 
 
@@ -46,7 +46,7 @@ async def get_users() -> list[UserBase]:
 
     # parsing User to UserBase using parse_obj to avoid `id` loss -- pydantic V2 bug
     for user_record in user_records:
-        user = UserBase(
+        user = UserBaseResponse(
             id=user_record.id,
             name=user_record.name,
             email=user_record.email,
@@ -98,7 +98,7 @@ async def get_user(
         user_record = await get_user_from_database(None, user_email, missing_user_error=missing_user_error)
 
     user_record = cast(User, user_record)
-    user = UserBase(
+    user = UserBaseResponse(
         id=user_record.id,
         name=user_record.name,
         email=user_record.email,

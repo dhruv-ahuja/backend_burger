@@ -1,11 +1,10 @@
-import datetime as dt
-from decimal import Decimal
 from enum import Enum
 
-from beanie import Document, Link, Replace, SaveChanges, Update, ValidateOnSave, after_event
+from beanie import Link
 from pydantic import Field
 
-from src.schemas.poe import Currency
+from src.models.common import DateMetadataDocument
+from src.schemas.poe import ItemPrice
 
 
 class ItemIdType(str, Enum):
@@ -13,20 +12,13 @@ class ItemIdType(str, Enum):
     receive = "receive"
 
 
-# TODO: see if we can modularize the created-updated time and update-time aspects
-class ItemCategory(Document):
+class ItemCategory(DateMetadataDocument):
     """ItemCategory represents a major category that items belong to. A category is the primary form of classifying
     items. Each category belongs to a category group (model not defined for category groups)."""
 
     name: str
     internal_name: str
     group: str
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
-    def update_time(self):
-        self.updated_time = dt.datetime.now()
 
     class Settings:
         """Defines the settings for the collection."""
@@ -34,49 +26,21 @@ class ItemCategory(Document):
         name = "poe_item_categories"
 
 
-class Item(Document):
-    """Item represents a Path of Exile in-game item. Each item belongs to a category."""
+class Item(DateMetadataDocument):
+    """Item represents a Path of Exile in-game item. Each item belongs to a category. It contains information such as
+    item type and the current, past and predicted pricing, encapsulated in the `ItemPrice` schema."""
 
     poe_ninja_id: int
     id_type: ItemIdType | None = None
     name: str
     category: Link[ItemCategory]
+    price: ItemPrice | None
     type_: str | None = Field(None, serialization_alias="type")
     variant: str | None = None
     icon_url: str | None = None
     enabled: bool = True
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
-    def update_time(self):
-        self.updated_time = dt.datetime.now()
 
     class Settings:
         """Defines the settings for the collection."""
 
         name = "poe_items"
-
-
-class ItemPrice(Document):
-    """ItemPrice holds information regarding the current, past and future price of an item.
-    It stores the recent and predicted prices in a dictionary, with the date as the key."""
-
-    item: Link[Item]
-    price: Decimal
-    currency: Currency
-    price_history: dict[dt.datetime, Decimal]
-    price_history_currency: Currency
-    price_prediction: dict[dt.datetime, Decimal]
-    price_prediction_currency: Currency
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
-
-    @after_event(Replace, SaveChanges, Update, ValidateOnSave)
-    def update_time(self):
-        self.updated_time = dt.datetime.now()
-
-    class Settings:
-        """Defines the settings for the collection."""
-
-        name = "poe_item_prices"

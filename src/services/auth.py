@@ -8,7 +8,7 @@ from motor.core import AgnosticClientSession
 from starlette import status
 
 from src.models.users import User, BlacklistedToken
-from src.schemas.users import UserBase, UserSession
+from src.schemas.users import UserBase, UserBaseResponse, UserSession
 from src.services import users as users_service
 from src.utils.auth_utils import compare_values
 
@@ -30,7 +30,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> UserB
     if not valid_password:
         raise invalid_credentials_error
 
-    user_base = user = UserBase(
+    user_base = user = UserBaseResponse(
         id=user.id,
         name=user.name,
         email=user.email,

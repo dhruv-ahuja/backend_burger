@@ -4,8 +4,8 @@ import beanie
 
 from .app import AppConfig
 from .users import User, BlacklistedToken
-from .poe import Item, ItemCategory, ItemPrice
+from .poe import Item, ItemCategory
 
 
 # group and export models for initializing Beanie connection
-document_models: list[Type[beanie.Document]] = [User, BlacklistedToken, AppConfig, Item, ItemCategory, ItemPrice]
+document_models: list[Type[beanie.Document]] = [User, BlacklistedToken, AppConfig, Item, ItemCategory]
