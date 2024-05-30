@@ -4,11 +4,12 @@ from beanie import Document, Link
 from pydantic import Field, SecretStr
 from pymongo import IndexModel
 
+from src.models.common import DateMetadataDocument
 from src.schemas.users import UserBase, UserSession
 
 
 # TODO: add user status and login attempts columns
-class User(UserBase, Document):
+class User(UserBase, DateMetadataDocument):
     """User represents a User of the application."""
 
     password: SecretStr = Field(min_length=8)
