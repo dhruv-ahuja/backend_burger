@@ -23,7 +23,18 @@ class Category:
     enabled: bool = True
 
 
+@dataclass
+class ApiItemData:
+    item_data: list[dict[str, Any]]
+    currency_item_metadata: list[dict[str, Any]]
+
+
 # * these encapsulate required currency and item data for each entry from API responses
+class CurrencyItemMetadata(BaseModel):
+    id: int
+    icon: str | None = None
+
+
 class CurrencyItemEntity(BaseModel):
     class Pay(BaseModel):
         pay_currency_id: int
@@ -34,6 +45,7 @@ class CurrencyItemEntity(BaseModel):
     currencyTypeName: str
     pay: Pay | None = None
     receive: Receive | None = None
+    metadata: CurrencyItemMetadata | None = None
 
 
 class ItemEntity(BaseModel):
@@ -128,9 +140,7 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def prepare_api_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
-):
+async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]):
     start = time.perf_counter()
     async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
@@ -170,28 +180,61 @@ async def get_category_by_name(name: str) -> ItemCategory | None:
     return category_record
 
 
-async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> list[dict[str, Any]]:
+async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData:
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
 
     api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
     url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
 
+    item_data = []
+    currency_item_metadata = []
+
     try:
         response = await client.get(url)
         logger.debug(f"category: {internal_category_name}, status_code: {response.status_code}")
     except RequestError as exc:
         logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
-        item_data = []
     else:
-        # TODO: parse and pass currency icons separately
-        item_data: list[dict] = response.json()["lines"]
+        json_response = response.json()
+        item_data: list[dict] = json_response["lines"]
+        currency_item_metadata: list[dict] = json_response.get("currencyDetails", [])
 
-    return item_data
+    api_item_data = ApiItemData(item_data, currency_item_metadata)
+    return api_item_data
+
+
+def parse_api_entity(
+    api_item_entity: dict[str, Any], is_currency: bool, currency_item_metadata: list[dict[str, Any]], item_index: int
+) -> CurrencyItemEntity | ItemEntity | None:
+    """Parse API Entity data into respective Currency or ItemEntity instances, adding currency item metadata
+    for items under the currency group, if metadata is available."""
+
+    item_entity = None
+
+    try:
+        if is_currency:
+            item_entity = CurrencyItemEntity(**api_item_entity)
+            if len(currency_item_metadata) >= item_index + 1:
+                api_item_metadata = currency_item_metadata[item_index]
+                item_entity.metadata = CurrencyItemMetadata(**api_item_metadata)
+        else:
+            item_entity = ItemEntity(**api_item_entity)
+    except pydantic.ValidationError as exc:
+        if is_currency:
+            name = api_item_entity.get("currencyTypeName")
+            item_type = "currency"
+        else:
+            name = api_item_entity.get("name")
+            item_type = "item"
+
+        logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+
+    return item_entity
 
 
 async def parse_api_item_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None], item_data_queue: Queue[list[Item] | None]
 ) -> None:
     """Fetches item API data from the respective queue, and parses it into apt Pydantic model instances, hence
     structuring each item in the list and validating its values.
@@ -214,20 +257,14 @@ async def parse_api_item_data(
         category_internal_name = category_record.internal_name
 
         is_currency = category_internal_name == "Currency"
+        currency_item_metadata = api_item_data.currency_item_metadata
+
         logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
 
-        for api_item_entity in api_item_data:
-            try:
-                item_entity = CurrencyItemEntity(**api_item_entity) if is_currency else ItemEntity(**api_item_entity)
-            except pydantic.ValidationError as exc:
-                if is_currency:
-                    name = api_item_entity.get("currencyTypeName")
-                    item_type = "currency"
-                else:
-                    name = api_item_entity.get("name")
-                    item_type = "item"
+        for item_index, api_item_entity in enumerate(api_item_data.item_data):
+            item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata, item_index)
 
-                logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+            if item_entity is None:
                 continue
 
             if is_currency:
@@ -319,11 +356,11 @@ async def main():
     await connect_to_mongodb(document_models)
     await save_item_categories()
 
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None] = Queue()
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None] = Queue()
     item_data_queue: Queue[list[Item] | None] = Queue()
 
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(prepare_api_data(api_item_data_queue, item_data_queue))
+        tg.create_task(prepare_api_data(api_item_data_queue))
         tg.create_task(parse_api_item_data(api_item_data_queue, item_data_queue))
         tg.create_task(save_item_data(item_data_queue))
 
