@@ -281,12 +281,14 @@ async def parse_api_item_data(
                     logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
                     continue
 
+                item_metadata = item_entity.metadata
                 item_record = Item(
                     poe_ninja_id=poe_ninja_id,
                     id_type=id_type,
                     name=item_entity.currencyTypeName,
-                    category=category_record,  # type: ignore
                     type_=None,
+                    category=category_record,  # type: ignore
+                    icon_url=item_metadata.icon if item_metadata else None,
                 )
 
             else:
