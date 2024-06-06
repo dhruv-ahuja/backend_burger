@@ -34,7 +34,7 @@ class Item(DateMetadataDocument):
     id_type: ItemIdType | None = None
     name: str
     category: Link[ItemCategory]
-    price: ItemPrice | None
+    price: ItemPrice | None = None
     type_: str | None = Field(None, serialization_alias="type")
     variant: str | None = None
     icon_url: str | None = None
