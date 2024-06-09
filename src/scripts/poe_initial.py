@@ -255,6 +255,50 @@ def parse_api_entity(
     return item_entity
 
 
+def prepare_item_record(
+    item_entity: CurrencyItemEntity | ItemEntity, category_record: ItemCategory, is_currency: bool
+) -> Item | None:
+    """Prepares item record by assigning parsed data to the DB model instance. Skips instantiating currency records if
+    neither pay or get IDs are available to act as an identifier."""
+
+    if is_currency:
+        item_entity = cast(CurrencyItemEntity, item_entity)
+        id_type = None
+
+        if item_entity.pay is not None:
+            poe_ninja_id = item_entity.pay.pay_currency_id
+            id_type = ItemIdType.pay
+        elif item_entity.receive is not None:
+            poe_ninja_id = item_entity.receive.get_currency_id
+            id_type = ItemIdType.receive
+        else:
+            logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
+            return
+
+        item_metadata = item_entity.metadata
+        item_record = Item(
+            poe_ninja_id=poe_ninja_id,
+            id_type=id_type,
+            name=item_entity.currencyTypeName,
+            type_=None,
+            category=category_record,  # type: ignore
+            icon_url=item_metadata.icon if item_metadata else None,
+        )
+
+    else:
+        item_entity = cast(ItemEntity, item_entity)
+        item_record = Item(
+            poe_ninja_id=item_entity.id_,
+            name=item_entity.name,
+            type_=item_entity.itemType,
+            category=category_record,  # type: ignore
+            icon_url=item_entity.icon,
+            variant=item_entity.variant,
+        )
+
+    return item_record
+
+
 async def parse_api_item_data(
     api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None], item_data_queue: Queue[list[Item] | None]
 ) -> None:
@@ -285,45 +329,12 @@ async def parse_api_item_data(
 
         for api_item_entity in api_item_data.item_data:
             item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata)
-
             if item_entity is None:
                 continue
 
-            # TODO: refactor this section into a separate function
-            if is_currency:
-                item_entity = cast(CurrencyItemEntity, item_entity)
-                id_type = None
-
-                if item_entity.pay is not None:
-                    poe_ninja_id = item_entity.pay.pay_currency_id
-                    id_type = ItemIdType.pay
-                elif item_entity.receive is not None:
-                    poe_ninja_id = item_entity.receive.get_currency_id
-                    id_type = ItemIdType.receive
-                else:
-                    logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
-                    continue
-
-                item_metadata = item_entity.metadata
-                item_record = Item(
-                    poe_ninja_id=poe_ninja_id,
-                    id_type=id_type,
-                    name=item_entity.currencyTypeName,
-                    type_=None,
-                    category=category_record,  # type: ignore
-                    icon_url=item_metadata.icon if item_metadata else None,
-                )
-
-            else:
-                item_entity = cast(ItemEntity, item_entity)
-                item_record = Item(
-                    poe_ninja_id=item_entity.id_,
-                    name=item_entity.name,
-                    type_=item_entity.itemType,
-                    category=category_record,  # type: ignore
-                    icon_url=item_entity.icon,
-                    variant=item_entity.variant,
-                )
+            item_record = prepare_item_record(item_entity, category_record, is_currency)
+            if item_record is None:
+                continue
 
             item_records.append(item_record)
 
