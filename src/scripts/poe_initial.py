@@ -23,7 +23,18 @@ class Category:
     enabled: bool = True
 
 
+@dataclass
+class ApiItemData:
+    item_data: list[dict[str, Any]]
+    currency_item_metadata: list[dict[str, Any]]
+
+
 # * these encapsulate required currency and item data for each entry from API responses
+class CurrencyItemMetadata(BaseModel):
+    id_: int = Field(alias="id")
+    icon: str | None = None
+
+
 class CurrencyItemEntity(BaseModel):
     class Pay(BaseModel):
         pay_currency_id: int
@@ -34,6 +45,7 @@ class CurrencyItemEntity(BaseModel):
     currencyTypeName: str
     pay: Pay | None = None
     receive: Receive | None = None
+    metadata: CurrencyItemMetadata | None = None
 
 
 class ItemEntity(BaseModel):
@@ -128,9 +140,7 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def prepare_api_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
-):
+async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]):
     start = time.perf_counter()
     async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
@@ -170,28 +180,127 @@ async def get_category_by_name(name: str) -> ItemCategory | None:
     return category_record
 
 
-async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> list[dict[str, Any]]:
+async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData:
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
 
     api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
     url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
 
+    item_data = []
+    currency_item_metadata = []
+
     try:
         response = await client.get(url)
         logger.debug(f"category: {internal_category_name}, status_code: {response.status_code}")
     except RequestError as exc:
         logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
-        item_data = []
     else:
-        # TODO: parse and pass currency icons separately
-        item_data: list[dict] = response.json()["lines"]
+        json_response = response.json()
+        item_data: list[dict] = json_response["lines"]
+        currency_item_metadata: list[dict] = json_response.get("currencyDetails", [])
 
-    return item_data
+    api_item_data = ApiItemData(item_data, currency_item_metadata)
+    return api_item_data
+
+
+def map_currency_icon_urls(currency_item_metadata: list[dict[str, Any]]) -> dict[int, CurrencyItemMetadata]:
+    """Maps a list of currency item metadata to each records' ID."""
+
+    currency_item_mapping = {}
+
+    for data in currency_item_metadata:
+        try:
+            entry = CurrencyItemMetadata(**data)
+            currency_item_mapping[entry.id_] = entry
+        except pydantic.ValidationError as exc:
+            logger.error(f"error parsing currency icon data ({data}) into schema: {exc}")
+            continue
+
+    return currency_item_mapping
+
+
+def parse_api_entity(
+    api_item_entity: dict[str, Any], is_currency: bool, currency_item_metadata: list[dict[str, Any]]
+) -> CurrencyItemEntity | ItemEntity | None:
+    """Parse API Entity data into respective Currency or ItemEntity instances, adding currency item metadata
+    for items under the currency group, if metadata is available."""
+
+    item_entity = None
+    currency_item_mapping = map_currency_icon_urls(currency_item_metadata)
+
+    try:
+        if is_currency:
+            item_entity = CurrencyItemEntity(**api_item_entity)
+
+            if item_entity.pay and item_entity.pay.pay_currency_id:
+                currency_item_id = item_entity.pay.pay_currency_id
+            elif item_entity.receive and item_entity.receive.get_currency_id:
+                currency_item_id = item_entity.receive.get_currency_id
+
+            api_item_metadata = currency_item_mapping.get(currency_item_id)
+            item_entity.metadata = api_item_metadata
+        else:
+            item_entity = ItemEntity(**api_item_entity)
+    except pydantic.ValidationError as exc:
+        if is_currency:
+            name = api_item_entity.get("currencyTypeName")
+            item_type = "currency"
+        else:
+            name = api_item_entity.get("name")
+            item_type = "item"
+
+        logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+
+    return item_entity
+
+
+def prepare_item_record(
+    item_entity: CurrencyItemEntity | ItemEntity, category_record: ItemCategory, is_currency: bool
+) -> Item | None:
+    """Prepares item record by assigning parsed data to the DB model instance. Skips instantiating currency records if
+    neither pay or get IDs are available to act as an identifier."""
+
+    if is_currency:
+        item_entity = cast(CurrencyItemEntity, item_entity)
+        id_type = None
+
+        if item_entity.pay is not None:
+            poe_ninja_id = item_entity.pay.pay_currency_id
+            id_type = ItemIdType.pay
+        elif item_entity.receive is not None:
+            poe_ninja_id = item_entity.receive.get_currency_id
+            id_type = ItemIdType.receive
+        else:
+            logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
+            return
+
+        item_metadata = item_entity.metadata
+        item_record = Item(
+            poe_ninja_id=poe_ninja_id,
+            id_type=id_type,
+            name=item_entity.currencyTypeName,
+            type_=None,
+            category=category_record,  # type: ignore
+            icon_url=item_metadata.icon if item_metadata else None,
+        )
+
+    else:
+        item_entity = cast(ItemEntity, item_entity)
+        item_record = Item(
+            poe_ninja_id=item_entity.id_,
+            name=item_entity.name,
+            type_=item_entity.itemType,
+            category=category_record,  # type: ignore
+            icon_url=item_entity.icon,
+            variant=item_entity.variant,
+        )
+
+    return item_record
 
 
 async def parse_api_item_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None], item_data_queue: Queue[list[Item] | None]
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None], item_data_queue: Queue[list[Item] | None]
 ) -> None:
     """Fetches item API data from the respective queue, and parses it into apt Pydantic model instances, hence
     structuring each item in the list and validating its values.
@@ -214,54 +323,18 @@ async def parse_api_item_data(
         category_internal_name = category_record.internal_name
 
         is_currency = category_internal_name == "Currency"
+        currency_item_metadata = api_item_data.currency_item_metadata
+
         logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
 
-        for api_item_entity in api_item_data:
-            try:
-                item_entity = CurrencyItemEntity(**api_item_entity) if is_currency else ItemEntity(**api_item_entity)
-            except pydantic.ValidationError as exc:
-                if is_currency:
-                    name = api_item_entity.get("currencyTypeName")
-                    item_type = "currency"
-                else:
-                    name = api_item_entity.get("name")
-                    item_type = "item"
-
-                logger.error(f"error parsing '{name}' {item_type} entity data: {exc}")
+        for api_item_entity in api_item_data.item_data:
+            item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata)
+            if item_entity is None:
                 continue
 
-            if is_currency:
-                item_entity = cast(CurrencyItemEntity, item_entity)
-                id_type = None
-
-                if item_entity.pay is not None:
-                    poe_ninja_id = item_entity.pay.pay_currency_id
-                    id_type = ItemIdType.pay
-                elif item_entity.receive is not None:
-                    poe_ninja_id = item_entity.receive.get_currency_id
-                    id_type = ItemIdType.receive
-                else:
-                    logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
-                    continue
-
-                item_record = Item(
-                    poe_ninja_id=poe_ninja_id,
-                    id_type=id_type,
-                    name=item_entity.currencyTypeName,
-                    category=category_record,  # type: ignore
-                    type_=None,
-                )
-
-            else:
-                item_entity = cast(ItemEntity, item_entity)
-                item_record = Item(
-                    poe_ninja_id=item_entity.id_,
-                    name=item_entity.name,
-                    type_=item_entity.itemType,
-                    category=category_record,  # type: ignore
-                    icon_url=item_entity.icon,
-                    variant=item_entity.variant,
-                )
+            item_record = prepare_item_record(item_entity, category_record, is_currency)
+            if item_record is None:
+                continue
 
             item_records.append(item_record)
 
@@ -319,11 +392,11 @@ async def main():
     await connect_to_mongodb(document_models)
     await save_item_categories()
 
-    api_item_data_queue: Queue[tuple[ItemCategory, list[dict]] | None] = Queue()
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None] = Queue()
     item_data_queue: Queue[list[Item] | None] = Queue()
 
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(prepare_api_data(api_item_data_queue, item_data_queue))
+        tg.create_task(prepare_api_data(api_item_data_queue))
         tg.create_task(parse_api_item_data(api_item_data_queue, item_data_queue))
         tg.create_task(save_item_data(item_data_queue))
 
