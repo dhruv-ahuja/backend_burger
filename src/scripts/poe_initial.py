@@ -31,7 +31,7 @@ class ApiItemData:
 
 # * these encapsulate required currency and item data for each entry from API responses
 class CurrencyItemMetadata(BaseModel):
-    id: int
+    id_: int = Field(alias="id")
     icon: str | None = None
 
 
@@ -204,20 +204,42 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     return api_item_data
 
 
+def map_currency_icon_urls(currency_item_metadata: list[dict[str, Any]]) -> dict[int, CurrencyItemMetadata]:
+    """Maps a list of currency item metadata to each records' ID."""
+
+    currency_item_mapping = {}
+
+    for data in currency_item_metadata:
+        try:
+            entry = CurrencyItemMetadata(**data)
+            currency_item_mapping[entry.id_] = entry
+        except pydantic.ValidationError as exc:
+            logger.error(f"error parsing currency icon data ({data}) into schema: {exc}")
+            continue
+
+    return currency_item_mapping
+
+
 def parse_api_entity(
-    api_item_entity: dict[str, Any], is_currency: bool, currency_item_metadata: list[dict[str, Any]], item_index: int
+    api_item_entity: dict[str, Any], is_currency: bool, currency_item_metadata: list[dict[str, Any]]
 ) -> CurrencyItemEntity | ItemEntity | None:
     """Parse API Entity data into respective Currency or ItemEntity instances, adding currency item metadata
     for items under the currency group, if metadata is available."""
 
     item_entity = None
+    currency_item_mapping = map_currency_icon_urls(currency_item_metadata)
 
     try:
         if is_currency:
             item_entity = CurrencyItemEntity(**api_item_entity)
-            if len(currency_item_metadata) >= item_index + 1:
-                api_item_metadata = currency_item_metadata[item_index]
-                item_entity.metadata = CurrencyItemMetadata(**api_item_metadata)
+
+            if item_entity.pay and item_entity.pay.pay_currency_id:
+                currency_item_id = item_entity.pay.pay_currency_id
+            elif item_entity.receive and item_entity.receive.get_currency_id:
+                currency_item_id = item_entity.receive.get_currency_id
+
+            api_item_metadata = currency_item_mapping.get(currency_item_id)
+            item_entity.metadata = api_item_metadata
         else:
             item_entity = ItemEntity(**api_item_entity)
     except pydantic.ValidationError as exc:
@@ -261,12 +283,13 @@ async def parse_api_item_data(
 
         logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
 
-        for item_index, api_item_entity in enumerate(api_item_data.item_data):
-            item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata, item_index)
+        for api_item_entity in api_item_data.item_data:
+            item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata)
 
             if item_entity is None:
                 continue
 
+            # TODO: refactor this section into a separate function
             if is_currency:
                 item_entity = cast(CurrencyItemEntity, item_entity)
                 id_type = None
