@@ -1,4 +1,3 @@
-import datetime as dt
 from decimal import Decimal
 import math
 from typing import Annotated
@@ -21,15 +20,9 @@ def convert_price_to_int(value: Decimal):
     return math.ceil(value)
 
 
-def convert_days_ago_to_date(days_ago: int) -> dt.datetime:
-    return dt.datetime.now(dt.UTC) - dt.timedelta(days_ago)
-
-
 class PriceHistoryEntity(BaseModel):
     count: int
     value: Annotated[int, BeforeValidator(convert_price_to_int)]
-    # * convert `daysAgo` int values to date, and export them as `date` when seralizing into dicts or json
-    # date_: Annotated[dt.datetime, BeforeValidator(convert_days_ago_to_date)] = Field(alias="daysAgo", serialization_alias="date")
     days_ago: int = Field(alias="daysAgo")
 
 
@@ -63,6 +56,9 @@ async def get_price_history_data(category_internal_name: str, item_id: int):
 
 
 def predict_future_item_prices(data: list[PriceHistoryEntity], days: int = 4):
+    """Predicts future item prices based on the last 30 days' prices, predicting potential value for the next given
+    number of days."""
+
     df = pd.DataFrame([entity.model_dump() for entity in data])
 
     # Filter and keep only the last 30 days' data
@@ -86,7 +82,7 @@ def predict_future_item_prices(data: list[PriceHistoryEntity], days: int = 4):
     model_poly.fit(X_poly, Y)
 
     # Prepare future data for predictions
-    future_days_ago = [df["days_ago"].min() + i for i in range(1, 5)]  # Predicting for next 4 days
+    future_days_ago = [df["days_ago"].min() + i for i in range(1, days + 1)]
     future_count = df["count"].mean()
 
     future_data = pd.DataFrame({"days_ago": future_days_ago, "count": [future_count] * len(future_days_ago)})
@@ -99,5 +95,9 @@ def predict_future_item_prices(data: list[PriceHistoryEntity], days: int = 4):
 
     # Predict future values using both models
     predictions = model_poly.predict(future_X_poly)
+
+    print("\nPredictions for the next 4 days:")
+    for i, pred in enumerate(predictions):
+        print(f"Day {i + 1}: value: {pred:.2f}")
 
     return predictions
