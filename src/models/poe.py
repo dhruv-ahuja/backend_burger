@@ -1,7 +1,7 @@
 from enum import Enum
 
 from beanie import Link
-from pydantic import Field
+from pydantic import Field, Json
 
 from src.models.common import DateMetadataDocument
 from src.schemas.poe import ItemPrice
@@ -30,11 +30,12 @@ class Item(DateMetadataDocument):
     """Item represents a Path of Exile in-game item. Each item belongs to a category. It contains information such as
     item type and the current, past and predicted pricing, encapsulated in the `ItemPrice` schema."""
 
+    # TODO: ensure type_ field is serialized as 'type'
     poe_ninja_id: int
     id_type: ItemIdType | None = None
     name: str
     category: Link[ItemCategory]
-    price: ItemPrice | None = None
+    price: Json[ItemPrice] | None = None
     type_: str | None = Field(None, serialization_alias="type")
     variant: str | None = None
     icon_url: str | None = None
