@@ -45,25 +45,34 @@ class PriceHistoryEntity(BaseModel):
         return now - dt.timedelta(self.days_ago)
 
 
-# TODO: handle exceptions for db queries
 async def get_items(offset: int) -> list[Item]:
     """Gets all Items from the database."""
 
-    # avoiding links here as each object will fetch its own category record
-    return await Item.find_all(skip=offset, limit=BATCH_SIZE).to_list()
+    try:
+        # avoiding links here as each object will fetch its own category record
+        return await Item.find_all(skip=offset, limit=BATCH_SIZE).to_list()
+    except Exception as exc:
+        logger.error(f"error getting items with offset {offset}: {exc}")
+        raise
 
 
 async def get_and_map_categories() -> dict[str, ItemCategory]:
     """Gets and maps category model instances to their Ids."""
 
-    categories = await ItemCategory.find_all().to_list()
-    category_map = {str(category.id): category for category in categories}  # type: ignore
+    try:
+        categories = await ItemCategory.find_all().to_list()
+    except Exception as exc:
+        logger.error(f"error getting item categories: {exc}")
+        raise
 
+    category_map = {str(category.id): category for category in categories}
     return category_map
 
 
-async def update_items_data(items: list[Item]) -> None:
-    """Bulk-updates item data in the database."""
+async def update_items_data(items: list[Item], iteration_count: int) -> None:
+    """Bulk-updates item data in the database. Serializes item price schema into a JSON object for insertion into
+    the database. Creates an order of Pymongo-native `UpdateOne` operations and bulk writes them for efficiency over
+    inserting each record one-by-one."""
 
     bulk_operations = []
     item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()
@@ -74,7 +83,6 @@ async def update_items_data(items: list[Item]) -> None:
         bulk_operations.append(
             pymongo.UpdateOne(
                 {"_id": item.id},
-                # {"_id": {"$oid": str(item.id)}},
                 {
                     "$set": {"price": item_price_json},
                 },
@@ -83,7 +91,7 @@ async def update_items_data(items: list[Item]) -> None:
 
     try:
         result = await item_collection.bulk_write(bulk_operations)
-        print("result from bulk update query:", result)
+        logger.info(f"result from batch number {iteration_count}'s bulk update:", result)
     except Exception as exc:
         logger.error(f"error bulk writing: {exc}")
         logger.error(f"{type(exc)}")
@@ -91,8 +99,6 @@ async def update_items_data(items: list[Item]) -> None:
 
 async def get_price_history_data(category_internal_name: str, item_id: int) -> list[PriceHistoryEntity]:
     """Gets all available price history data for the given item_id, and parses it into a consistent schema model."""
-
-    # logger.debug(f"getting price history data for item_id {item_id} belonging to '{category_internal_name}' category")
 
     if category_internal_name in ("Currency", "Fragment"):
         url = f"/currencyhistory?league=Necropolis&type={category_internal_name}&currencyId={item_id}"
@@ -167,11 +173,6 @@ def predict_future_item_prices(price_history_data: list[PriceHistoryEntity], day
 
     # Predict future values using both models
     predictions = model_poly.predict(future_X_poly)
-
-    # print("\nPredictions for the next 4 days:")
-    # for i, pred in enumerate(predictions):
-    #     print(f"Day {i + 1}: value: {pred:.2f}")
-
     return predictions
 
 
@@ -208,16 +209,18 @@ async def main():
 
             await add_item_price_data(items, price_history_data, item_price_prediction_data)
 
-        await update_items_data(items)
+        await update_items_data(items, iteration_count)
         batch_stop = time.perf_counter()
 
-        print(f"time taken for price predictions for batch {iteration_count + 1} of items: {batch_stop - batch_start}")
+        logger.info(
+            f"time taken for price predictions for batch {iteration_count + 1} of items: {batch_stop - batch_start}"
+        )
 
         offset += BATCH_SIZE
         iteration_count += 1
 
     stop = time.perf_counter()
-    print(f"total time taken for predicting prices of {total_items}: {stop - start}")
+    logger.info(f"total time taken for predicting prices of {total_items}: {stop - start}")
 
 
 async def add_item_price_data(
