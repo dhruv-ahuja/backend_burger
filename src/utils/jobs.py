@@ -56,9 +56,8 @@ def _run_price_prediction_script():
         # Print the output from the script
         logger.info(f"Output from price prediction script: {result.stdout}")
 
-        # Check for errors
         if result.stderr:
-            logger.error(f"Errors from script: {result.stderr}")
+            logger.error(f"Errors or log ouputs from script: {result.stderr}")
 
     except subprocess.CalledProcessError as exc:
         logger.error(f"Error while running price prediction script: {exc}")
