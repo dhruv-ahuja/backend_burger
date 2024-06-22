@@ -1,7 +1,6 @@
 import asyncio
 import datetime as dt
 from decimal import Decimal
-import math
 import time
 from typing import Annotated
 
@@ -31,13 +30,13 @@ BATCH_SIZE = 500
 
 
 # schema logic
-def convert_price_to_int(value: Decimal):
-    return math.ceil(value)
+def round_off_price(value: float):
+    return round(Decimal(value), 2)
 
 
 class PriceHistoryEntity(BaseModel):
     count: int
-    value: Annotated[int, BeforeValidator(convert_price_to_int)]
+    value: Annotated[Decimal, BeforeValidator(round_off_price)]
     days_ago: int = Field(alias="daysAgo")
 
     def convert_days_ago_to_date(self):
@@ -202,6 +201,7 @@ async def main():
                 continue
 
             price_history_data = await get_price_history_data(item_category.internal_name, item.poe_ninja_id)
+
             item_price_history_data.append(price_history_data)
 
             price_predictions = predict_future_item_prices(price_history_data)
@@ -250,9 +250,8 @@ async def add_item_price_data(
             previous_date = entity.convert_days_ago_to_date()
             price_history_mapping[previous_date] = entity.value
 
-        # TODO: parse the value as Decimal, not int through Ceil
         item_price_data = ItemPrice(
-            price=todays_price_data.value,  # type: ignore
+            price=todays_price_data.value,
             currency=Currency.chaos,
             price_history=price_history_mapping,
             price_history_currency=Currency.chaos,
