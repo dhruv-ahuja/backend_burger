@@ -27,6 +27,8 @@ from src.schemas.poe import Currency, ItemPrice
 
 API_BASE_URL = "https://poe.ninja/api/data"
 
+BATCH_SIZE = 500
+
 
 # schema logic
 def convert_price_to_int(value: Decimal):
@@ -44,11 +46,11 @@ class PriceHistoryEntity(BaseModel):
 
 
 # TODO: handle exceptions for db queries
-async def get_items() -> list[Item]:
+async def get_items(offset: int) -> list[Item]:
     """Gets all Items from the database."""
 
     # avoiding links here as each object will fetch its own category record
-    return await Item.find_all().to_list()
+    return await Item.find_all(skip=offset, limit=BATCH_SIZE).to_list()
 
 
 async def get_and_map_categories() -> dict[str, ItemCategory]:
@@ -174,34 +176,48 @@ def predict_future_item_prices(price_history_data: list[PriceHistoryEntity], day
 
 
 async def main():
-    await connect_to_mongodb(document_models)
-    s = time.perf_counter()
+    offset = iteration_count = 0
 
-    items = await get_items()
+    await connect_to_mongodb(document_models)
+
+    start = time.perf_counter()
     category_map = await get_and_map_categories()
 
     item_price_history_data = []
     item_price_prediction_data = []
 
-    for item in items:
-        item_category_id = str(item.category.ref.id)
-        try:
-            item_category = category_map[item_category_id]
-        except KeyError:
-            logger.error(f"item category not found for '{item.name}' item with category id: {item_category_id}")
-            continue
+    total_items = await Item.count()
 
-        price_history_data = await get_price_history_data(item_category.internal_name, item.poe_ninja_id)
-        item_price_history_data.append(price_history_data)
+    while offset < total_items:
+        batch_start = time.perf_counter()
+        items = await get_items(offset)
 
-        price_predictions = predict_future_item_prices(price_history_data)
-        item_price_prediction_data.append(price_predictions)
+        for item in items:
+            item_category_id = str(item.category.ref.id)
+            try:
+                item_category = category_map[item_category_id]
+            except KeyError:
+                logger.error(f"item category not found for '{item.name}' item with category id: {item_category_id}")
+                continue
 
-        await add_item_price_data(items, price_history_data, item_price_prediction_data)
+            price_history_data = await get_price_history_data(item_category.internal_name, item.poe_ninja_id)
+            item_price_history_data.append(price_history_data)
 
-    await update_items_data(items)
+            price_predictions = predict_future_item_prices(price_history_data)
+            item_price_prediction_data.append(price_predictions)
 
-    print(f"time taken for predicting prices for {len(items)} items: {time.perf_counter() - s}")
+            await add_item_price_data(items, price_history_data, item_price_prediction_data)
+
+        await update_items_data(items)
+        batch_stop = time.perf_counter()
+
+        print(f"time taken for price predictions for batch {iteration_count + 1} of items: {batch_stop - batch_start}")
+
+        offset += BATCH_SIZE
+        iteration_count += 1
+
+    stop = time.perf_counter()
+    print(f"total time taken for predicting prices of {total_items}: {stop - start}")
 
 
 async def add_item_price_data(
