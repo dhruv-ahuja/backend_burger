@@ -1,4 +1,6 @@
 import datetime as dt
+import subprocess
+
 
 from apscheduler.job import Job
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -37,6 +39,40 @@ def schedule_tokens_deletion(delete_older_than: dt.datetime, scheduler: AsyncIOS
         trigger,
         delete_older_than=delete_older_than,
     )
+    logger.info(f"scheduled '{job_id}' job to run daily")
+
+    return job
+
+
+def _run_price_prediction_script():
+    """Runs the price prediction script, capturing any output and errors that happen during the process call."""
+
+    script_path = "src/scripts/price_prediction.py"
+    try:
+        logger.info("running price prediction script")
+        # Run the script and wait for it to complete
+        result = subprocess.run(["python", script_path], capture_output=True, text=True, check=True)
+
+        # Print the output from the script
+        logger.info(f"Output from price prediction script: {result.stdout}")
+
+        # Check for errors
+        if result.stderr:
+            logger.error(f"Errors from script: {result.stderr}")
+
+    except subprocess.CalledProcessError as exc:
+        logger.error(f"Error while running price prediction script: {exc}")
+    else:
+        logger.info("price prediction script ran successfully")
+
+
+def schedule_price_prediction_run(scheduler: AsyncIOScheduler) -> Job:
+    """Schedules the price prediction function to run daily."""
+
+    job_id = "price_prediction_run"
+    trigger = CronTrigger(hour=5, timezone=dt.UTC)
+
+    job = config.setup_job(scheduler, _run_price_prediction_script, job_id, trigger)
     logger.info(f"scheduled '{job_id}' job to run daily")
 
     return job
