@@ -267,7 +267,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     scheduler.start()
     async_scheduler.start()
 
-    delete_older_than = dt.datetime.utcnow() - dt.timedelta(days=1)
+    delete_older_than = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
     jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
     jobs.schedule_price_prediction_run(async_scheduler)
 

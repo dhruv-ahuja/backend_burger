@@ -233,7 +233,7 @@ def test_setup_job(get_scheduler: BackgroundScheduler, caplog: LogCaptureFixture
     scheduler = get_scheduler
 
     job_id = "sample_job"
-    trigger = DateTrigger(run_date=dt.datetime.utcnow())
+    trigger = DateTrigger(run_date=dt.datetime.now(dt.UTC))
     misfire_grace_time = None
 
     job = setup_job(scheduler, sample_job, job_id, trigger, misfire_grace_time)

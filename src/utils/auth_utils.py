@@ -22,7 +22,7 @@ def compare_values(value: str, hashed_value: str) -> bool:
 def create_bearer_token(expiry_time: dt.timedelta, sub: str | None = None) -> Tuple[str, dt.datetime]:
     """Creates an encoded access or refresh token with the given sub and expiry time."""
 
-    token_expires_in = dt.datetime.utcnow() + expiry_time
+    token_expires_in = dt.datetime.now(dt.UTC) + expiry_time
     token_data: dict[str, Any] = {"exp": token_expires_in}
 
     if sub is not None:
