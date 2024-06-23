@@ -79,7 +79,6 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
 
     forbidden_error = HTTPException(status.HTTP_401_UNAUTHORIZED)
 
-    breakpoint()
     token_data = check_bearer_token(refresh_token, forbidden_error)
     user_id = token_data["sub"]
     token_expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
