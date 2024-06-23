@@ -1,6 +1,5 @@
 import datetime as dt
 import orjson
-import pytz
 from typing import Any, cast
 
 from beanie import PydanticObjectId
@@ -80,6 +79,7 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
 
     forbidden_error = HTTPException(status.HTTP_401_UNAUTHORIZED)
 
+    breakpoint()
     token_data = check_bearer_token(refresh_token, forbidden_error)
     user_id = token_data["sub"]
     token_expiration_time = dt.datetime.fromtimestamp(token_data["exp"], dt.UTC)
@@ -97,9 +97,8 @@ async def check_refresh_token(refresh_token: str) -> dict[str, Any]:
     session_refresh_token = user_session.refresh_token
 
     session_expiration_time = cast(dt.datetime, user_session.expiration_time)
-    session_token_expiration_time = pytz.utc.localize(session_expiration_time)
 
-    if session_token_expiration_time < token_expiration_time or session_refresh_token != refresh_token:
+    if session_expiration_time < token_expiration_time or session_refresh_token != refresh_token:
         raise forbidden_error
 
     return token_data
