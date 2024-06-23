@@ -83,7 +83,7 @@ async def update_items_data(items: list[Item], iteration_count: int) -> None:
             pymongo.UpdateOne(
                 {"_id": item.id},
                 {
-                    "$set": {"price": item_price_json},
+                    "$set": {"price": item_price_json, "updated_date": dt.datetime.now(dt.UTC)},
                 },
             )
         )
