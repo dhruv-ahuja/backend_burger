@@ -13,4 +13,4 @@ class DateMetadataDocument(Document):
 
     @after_event(Update, Replace, SaveChanges, ValidateOnSave)
     def update_document_time(self) -> None:
-        self.updated_time = dt.datetime.now()
+        self.updated_time = dt.datetime.now(dt.UTC)
