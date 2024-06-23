@@ -119,7 +119,7 @@ async def update_user(user_id: PydanticObjectId, user_input: UserUpdateInput) ->
 
     user.name = user_input.name
     user.email = user_input.email
-    user.updated_time = dt.datetime.utcnow()
+    user.updated_time = dt.datetime.now(dt.UTC)
 
     try:
         await user.replace()  # type: ignore

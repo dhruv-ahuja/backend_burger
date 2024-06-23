@@ -21,7 +21,9 @@ from src.schemas.responses import BaseResponse
 newrelic.agent.initialize("./newrelic.ini")
 
 
-app = FastAPI(lifespan=setup_services, redirect_slashes=False, default_response_class=ORJSONResponse)
+app = FastAPI(
+    lifespan=setup_services, redirect_slashes=False, default_response_class=ORJSONResponse, title="Backend Burger"
+)
 
 app.include_router(users.router)
 app.include_router(auth.router)
