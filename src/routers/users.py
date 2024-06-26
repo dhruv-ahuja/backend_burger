@@ -1,6 +1,5 @@
-from typing import cast
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from loguru import logger
 from motor.core import AgnosticClientSession
 from redis.asyncio import Redis
@@ -8,7 +7,6 @@ from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
-from src.models.users import User
 from src.schemas.web_responses import users as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.schemas.users import UserBase, UserInput, UserUpdateInput
@@ -124,7 +122,8 @@ async def delete_user(
     redis_key = f"{app.USER_CACHE_KEY}:{user_id}"
 
     user = await service.get_user_from_database(user_base.id)
-    user = cast(User, user)
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
 
     async with db_session.start_transaction():
         try:
