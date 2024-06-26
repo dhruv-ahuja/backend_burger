@@ -27,3 +27,11 @@ class ItemPrice(BaseModel):
     price_history_currency: Currency
     price_prediction: dict[dt.datetime, Decimal]
     price_prediction_currency: Currency
+
+
+class ItemCategoryResponse(BaseModel):
+    """ItemCategoryResponse holds the requisite subset of ItemCategory's data for API responses."""
+
+    name: str
+    internal_name: str
+    group: str
