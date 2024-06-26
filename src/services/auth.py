@@ -20,7 +20,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> UserB
     invalid_credentials_error = HTTPException(status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Bearer"})
 
     user_email = form_data.username
-    user = await users_service.get_user_from_database(None, user_email, missing_user_error=False)
+    user = await users_service.get_user_from_database(None, user_email)
     if user is None:
         raise invalid_credentials_error
 

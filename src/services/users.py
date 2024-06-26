@@ -33,35 +33,19 @@ async def create_user(user_input: UserInput) -> UserBase:
     return UserBase.model_construct(**user.model_dump())
 
 
-async def get_users() -> list[UserBase]:
+async def get_users() -> list[UserBaseResponse]:
     """Fetches users from the database, returning them as a list of `UserBase` instances."""
 
     try:
-        user_records = await User.find_all().to_list()
+        user_records = await User.find_all().project(UserBaseResponse).to_list()
     except Exception as exc:
         logger.error(f"error fetching users: {exc}; error_type: {exc.__class__}")
         raise
 
-    users = []
-
-    # parsing User to UserBase using parse_obj to avoid `id` loss -- pydantic V2 bug
-    for user_record in user_records:
-        user = UserBaseResponse(
-            id=user_record.id,
-            name=user_record.name,
-            email=user_record.email,
-            role=user_record.role,
-            created_time=user_record.created_time,
-            updated_time=user_record.updated_time,
-        )
-        users.append(user)
-
-    return users
+    return user_records
 
 
-async def get_user_from_database(
-    user_id: PydanticObjectId | None, user_email: str | None = None, missing_user_error: bool = True
-) -> User | None:
+async def get_user_from_database(user_id: PydanticObjectId | None, user_email: str | None = None) -> User | None:
     """Fetches a user from the database. Raises a 404 error if the user does not exist and `missing_user_error`
     is `True`."""
 
@@ -77,15 +61,10 @@ async def get_user_from_database(
         logger.error(f"error fetching user: {exc}")
         raise
 
-    if user is None and missing_user_error:
-        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
-
     return user
 
 
-async def get_user(
-    user_id: PydanticObjectId | None, user_email: str | None = None, missing_user_error: bool = True
-) -> UserBase:
+async def get_user(user_id: PydanticObjectId | None, user_email: str | None = None) -> UserBase:
     """Fetches and returns a user from the database, if user exists, given the user ID or email."""
 
     if user_id is user_email is None:
@@ -93,11 +72,13 @@ async def get_user(
 
     # fetch user and narrow its type to prevent type errors
     if user_id is not None:
-        user_record = await get_user_from_database(user_id, missing_user_error=missing_user_error)
+        user_record = await get_user_from_database(user_id)
     else:
-        user_record = await get_user_from_database(None, user_email, missing_user_error=missing_user_error)
+        user_record = await get_user_from_database(None, user_email)
 
-    user_record = cast(User, user_record)
+    if user_record is None:
+        raise HTTPException(HTTP_404_NOT_FOUND, "User not found.")
+
     user = UserBaseResponse(
         id=user_record.id,
         name=user_record.name,
