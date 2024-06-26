@@ -1,10 +1,8 @@
 import datetime as dt
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated
 
-from beanie import Link
-from pydantic import AfterValidator, BaseModel, Field, Json
+from pydantic import BaseModel, Field, Json
 
 
 class Currency(str, Enum):
@@ -35,3 +33,16 @@ class ItemCategoryResponse(BaseModel):
     name: str
     internal_name: str
     group: str
+
+
+class ItemBase(BaseModel):
+    """ItemBase encapsulates core fields of the Item document."""
+
+    poe_ninja_id: int
+    id_type: ItemIdType | None = None
+    name: str
+    price: Json[ItemPrice] | None = None
+    type_: str | None = Field(None, serialization_alias="type")
+    variant: str | None = None
+    icon_url: str | None = None
+    enabled: bool = True
