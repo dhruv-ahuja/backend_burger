@@ -33,32 +33,19 @@ async def create_user(user_input: UserInput) -> UserBase:
     return UserBase.model_construct(**user.model_dump())
 
 
-async def get_users() -> list[UserBase]:
+async def get_users() -> list[UserBaseResponse]:
     """Fetches users from the database, returning them as a list of `UserBase` instances."""
 
     try:
-        user_records = await User.find_all().to_list()
+        user_records = await User.find_all().project(UserBaseResponse).to_list()
     except Exception as exc:
         logger.error(f"error fetching users: {exc}; error_type: {exc.__class__}")
         raise
 
-    users = []
-
-    # parsing User to UserBase using parse_obj to avoid `id` loss -- pydantic V2 bug
-    for user_record in user_records:
-        user = UserBaseResponse(
-            id=user_record.id,
-            name=user_record.name,
-            email=user_record.email,
-            role=user_record.role,
-            created_time=user_record.created_time,
-            updated_time=user_record.updated_time,
-        )
-        users.append(user)
-
-    return users
+    return user_records
 
 
+# TODO: remove missing user error
 async def get_user_from_database(
     user_id: PydanticObjectId | None, user_email: str | None = None, missing_user_error: bool = True
 ) -> User | None:
