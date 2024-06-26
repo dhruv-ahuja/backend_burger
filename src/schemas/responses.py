@@ -53,7 +53,7 @@ class AppResponse(ORJSONResponse, Generic[T, E]):
         """Dumps Pydantic models or keeps content as is, passing it to the parent `__init__` function."""
 
         if isinstance(content, BaseResponse):
-            data = content.model_dump()
+            data = content.model_dump(mode="json")
         else:
             data = content
 
