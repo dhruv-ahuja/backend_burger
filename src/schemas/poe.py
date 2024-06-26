@@ -1,13 +1,20 @@
 import datetime as dt
 from decimal import Decimal
 from enum import Enum
+from typing import Annotated
 
-from pydantic import BaseModel
+from beanie import Link
+from pydantic import AfterValidator, BaseModel, Field, Json
 
 
 class Currency(str, Enum):
     chaos = "chaos"
     divines = "divines"
+
+
+class ItemIdType(str, Enum):
+    pay = "pay"
+    receive = "receive"
 
 
 class ItemPrice(BaseModel):

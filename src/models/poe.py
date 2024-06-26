@@ -4,12 +4,7 @@ from beanie import Link
 from pydantic import Field, Json
 
 from src.models.common import DateMetadataDocument
-from src.schemas.poe import ItemPrice
-
-
-class ItemIdType(str, Enum):
-    pay = "pay"
-    receive = "receive"
+from src.schemas.poe import ItemIdType, ItemPrice
 
 
 class ItemCategory(DateMetadataDocument):
