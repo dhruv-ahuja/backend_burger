@@ -33,7 +33,7 @@ def group_item_categories(item_categories: list[ItemCategoryResponse]) -> dict[s
 
 async def get_items_by_group(category_group: str) -> list[ItemBase]:
     """
-    Gets enabled/active items by given category group. Raises a 400 error if category group is invalid.
+    Gets items by given category group. Raises a 400 error if category group is invalid.
     """
 
     try:
@@ -46,8 +46,14 @@ async def get_items_by_group(category_group: str) -> list[ItemBase]:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid category group.")
 
     try:
-        items = await Item.find(Item.category.group == category_group, fetch_links=True).project(ItemBase).to_list()  # type: ignore
-
+        items = (
+            await Item.find(
+                Item.category.group == category_group,  # type: ignore
+                fetch_links=True,
+            )
+            .project(ItemBase)
+            .to_list()
+        )
     except Exception as exc:
         logger.error(f"error getting item by category group '{category_group}': {exc}")
         raise
