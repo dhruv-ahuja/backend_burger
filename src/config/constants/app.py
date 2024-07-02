@@ -3,7 +3,7 @@ from uuid import uuid4
 import datetime as dt
 
 from beanie.odm.interfaces.find import FindType, DocumentProjectionType
-from beanie.odm.queries.find import FindMany, FindOne
+from beanie.odm.queries.find import FindMany
 
 
 PROJECT_NAME = "backend_burger"
@@ -27,3 +27,6 @@ USERS_CACHE_DURATION = 5 * 60
 
 ITEMS_PER_PAGE = 100
 MAXIMUM_ITEMS_PER_PAGE = 500
+
+SORT_OPERATIONS = Literal["asc", "desc"]
+FIND_MANY_QUERY = FindMany[FindType] | FindMany[DocumentProjectionType]
