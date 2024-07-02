@@ -1,9 +1,11 @@
-from typing import Awaitable
+import math
+from typing import Any, Awaitable
 
 from loguru import logger
 from redis.asyncio import Redis
 
-from src.schemas.responses import BaseResponse
+from src.schemas.requests import PaginationInput
+from src.schemas.responses import BaseResponse, PaginationResponse
 from src.utils.services import cache_data, get_cached_data, serialize_response
 
 
@@ -41,3 +43,18 @@ async def get_or_cache_serialized_entity(
     logger.debug(f"cached '{redis_key}' data")
 
     return serialized_entity
+
+
+def create_pagination_response(data: Any, total_items: int, pagination: PaginationInput, data_key: str) -> BaseResponse:
+    """Creates a response structure warpped in a `BaseResponse`, calculating and assigning pagination values."""
+
+    per_page = pagination.per_page
+    total_pages = math.ceil(total_items / per_page)
+
+    pagination_response = PaginationResponse(
+        page=pagination.page, per_page=pagination.per_page, total_items=total_items, total_pages=total_pages
+    )
+    response_data = {data_key: data, "pagination": pagination_response}
+
+    response = BaseResponse(data=response_data)
+    return response
