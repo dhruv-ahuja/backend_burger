@@ -1,7 +1,12 @@
+from typing import Type
+from beanie import Document
 from loguru import logger
 import orjson
+import pymongo
 from redis.asyncio import Redis, RedisError
 
+from src.config.constants.app import FIND_MANY_QUERY
+from src.schemas.requests import SortInput
 from src.schemas.responses import E, T, BaseResponse
 
 
@@ -47,3 +52,24 @@ async def delete_cached_data(key: str, redis_client: Redis) -> None:
     except RedisError as exc:
         logger.error(f"error deleting cached data: {exc}")
         raise
+
+
+def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput | None) -> FIND_MANY_QUERY:
+    """Parses, gathers and chains sort operations on the input query. Skips the process if sort input is empty."""
+
+    if sort is None:
+        return query
+
+    sort_expressions = []
+
+    for entry in sort.sort_input:
+        field = entry.field
+        operation = pymongo.ASCENDING if entry.operation == "asc" else pymongo.DESCENDING
+
+        model_field = getattr(model, field)
+        expression = (model_field, operation)
+
+        sort_expressions.append(expression)
+
+    query = query.sort(sort_expressions)
+    return query
