@@ -22,24 +22,24 @@ class PaginationInput(BaseModel):
         return (self.page - 1) * self.per_page
 
 
-class SortInput(BaseModel):
-    """SortInput encapsulates the sorting schema model and its implementation as FastAPI's Body object.
-    Dependant handler functions will expect a `sort_input` key in the request's JSON body."""
+class SortSchema(BaseModel):
+    """SortInput encapsulates the sorting schema model, requiring the field to sort on, and the sort operation type."""
 
-    class SortSchema(BaseModel):
-        field: Annotated[str, lowercase_validator]
-        operation: Annotated[SORT_OPERATIONS, lowercase_validator]
-
-    sort_input: list[SortSchema] = Field(Body(...))
+    field: Annotated[str, lowercase_validator]
+    operation: Annotated[SORT_OPERATIONS, lowercase_validator]
 
 
-class FilterInput(BaseModel):
-    """FilterInput encapsulates the filter schema model and its implementation as FastAPI's Body object.
-    Dependant handler functions will expect a `filter_input` key in the request's JSON body."""
+class FilterSchema(BaseModel):
+    """FilterSchema encapsulates the filter schema model, requiring a field, a valid operation and the value to filter on the field by."""
 
-    class FilterSchema(BaseModel):
-        field: Annotated[str, lowercase_validator]
-        operation: Annotated[FILTER_OPERATIONS, lowercase_validator]
-        value: str = Field(min_length=1, max_length=200)
+    field: Annotated[str, lowercase_validator]
+    operation: Annotated[FILTER_OPERATIONS, lowercase_validator]
+    value: str = Field(min_length=1, max_length=200)
 
-    filter_input: list[FilterSchema] = Field(Body(..., embed=True))
+
+class FilterSortInput(BaseModel):
+    """FilterSortInput wraps filter and sort schema implementations, enabling them to be embedded as JSON body
+    parameters for FastAPI request handler functions."""
+
+    filter_: list[FilterSchema] | None = Field(Body(None, embed=True), alias="filter")
+    sort: list[SortSchema] | None = Field(Body(None, embed=True))

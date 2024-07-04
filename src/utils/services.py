@@ -9,7 +9,7 @@ import pymongo
 from redis.asyncio import Redis, RedisError
 
 from src.config.constants.app import FIND_MANY_QUERY
-from src.schemas.requests import FilterInput, SortInput
+from src.schemas.requests import FilterSchema, SortSchema
 from src.schemas.responses import E, T, BaseResponse
 
 
@@ -57,7 +57,7 @@ async def delete_cached_data(key: str, redis_client: Redis) -> None:
         raise
 
 
-def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput | None) -> FIND_MANY_QUERY:
+def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: list[SortSchema] | None) -> FIND_MANY_QUERY:
     """Parses, gathers and chains sort operations on the input query. Skips the process if sort input is empty."""
 
     if sort is None:
@@ -65,7 +65,7 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput
 
     sort_expressions = []
 
-    for entry in sort.sort_input:
+    for entry in sort:
         field = entry.field
         operation = pymongo.ASCENDING if entry.operation == "asc" else pymongo.DESCENDING
 
@@ -78,7 +78,9 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput
     return query
 
 
-def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: FilterInput | None) -> FIND_MANY_QUERY:
+def filter_on_query(
+    query: FIND_MANY_QUERY, model: Type[Document], filter_: list[FilterSchema] | None
+) -> FIND_MANY_QUERY:
     """Parses, gathers and chains filter operations on the input query. Skips the process if filter input is empty.\n
     Maps the operation list to operator arguments that allow using the operator dynamically, to create expressions
     within the Beanie `find` method."""
@@ -96,7 +98,7 @@ def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: Filt
         "like": RegExOperator,
     }
 
-    for entry in filter_.filter_input:
+    for entry in filter_:
         field = entry.field
         operation = entry.operation
         operation_function = operation_map[operation]
