@@ -1,12 +1,15 @@
+import operator
 from typing import Type
+
 from beanie import Document
+from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
 from loguru import logger
 import orjson
 import pymongo
 from redis.asyncio import Redis, RedisError
 
 from src.config.constants.app import FIND_MANY_QUERY
-from src.schemas.requests import SortInput
+from src.schemas.requests import FilterInput, SortInput
 from src.schemas.responses import E, T, BaseResponse
 
 
@@ -72,4 +75,41 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput
         sort_expressions.append(expression)
 
     query = query.sort(sort_expressions)
+    return query
+
+
+def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: FilterInput | None) -> FIND_MANY_QUERY:
+    """Parses, gathers and chains filter operations on the input query. Skips the process if filter input is empty.\n
+    Maps the operation list to operator arguments that allow using the operator dynamically, to create expressions
+    within the Beanie `find` method."""
+
+    if filter_ is None:
+        return query
+
+    operation_map = {
+        "=": operator.eq,
+        "!=": operator.ne,
+        ">": operator.gt,
+        "<": operator.lt,
+        ">=": operator.ge,
+        "<=": operator.le,
+        "like": RegExOperator,
+    }
+
+    for entry in filter_.filter_input:
+        field = entry.field
+        operation = entry.operation
+        operation_function = operation_map[operation]
+        value = entry.value
+
+        model_field = getattr(model, field)
+
+        if operation != "like":
+            query = query.find(operation_function(model_field, value))
+        else:
+            operation_function = RegExOperator
+            options = "i"  # case-insensitive search
+
+            query = query.find(operation_function(model_field, value, options=options))
+
     return query

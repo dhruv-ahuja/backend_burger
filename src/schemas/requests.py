@@ -2,7 +2,7 @@ from typing import Annotated
 from fastapi import Body, Query
 from pydantic import BaseModel, BeforeValidator, Field, computed_field
 
-from src.config.constants.app import ITEMS_PER_PAGE, MAXIMUM_ITEMS_PER_PAGE, SORT_OPERATIONS
+from src.config.constants.app import FILTER_OPERATIONS, ITEMS_PER_PAGE, MAXIMUM_ITEMS_PER_PAGE, SORT_OPERATIONS
 
 
 lowercase_validator = BeforeValidator(lambda v: v.lower())
@@ -30,4 +30,16 @@ class SortInput(BaseModel):
         field: Annotated[str, lowercase_validator]
         operation: Annotated[SORT_OPERATIONS, lowercase_validator]
 
-    sort_input: list[SortSchema] = Field(Body(..., embed=True))
+    sort_input: list[SortSchema] = Field(Body(...))
+
+
+class FilterInput(BaseModel):
+    """FilterInput encapsulates the filter schema model and its implementation as FastAPI's Body object.
+    Dependant handler functions will expect a `filter_input` key in the request's JSON body."""
+
+    class FilterSchema(BaseModel):
+        field: Annotated[str, lowercase_validator]
+        operation: Annotated[FILTER_OPERATIONS, lowercase_validator]
+        value: str = Field(min_length=1, max_length=200)
+
+    filter_input: list[FilterSchema] = Field(Body(..., embed=True))
