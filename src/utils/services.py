@@ -1,5 +1,6 @@
+import copy
 import operator
-from typing import Type
+from typing import Self, Type
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
@@ -9,7 +10,7 @@ import pymongo
 from redis.asyncio import Redis, RedisError
 
 from src.config.constants.app import FIND_MANY_QUERY
-from src.schemas.requests import FilterSchema, SortSchema
+from src.schemas.requests import FilterSchema, PaginationInput, SortSchema
 from src.schemas.responses import E, T, BaseResponse
 
 
@@ -115,3 +116,28 @@ def filter_on_query(
             query = query.find(operation_function(model_field, value, options=options))
 
     return query
+
+
+class QueryChainer:
+    def __init__(self, initial_query: FIND_MANY_QUERY, model: Type[Document]) -> None:
+        self._query = initial_query
+        self.model = model
+
+    def sort(self, sort: list[SortSchema] | None) -> Self:
+        self._query = sort_on_query(self._query, self.model, sort)
+        return self
+
+    def filter(self, filter_: list[FilterSchema] | None) -> Self:
+        filter_on_query(self._query, self.model, filter_)
+        return self
+
+    def paginate(self, pagination: PaginationInput) -> Self:
+        self._query.find(skip=pagination.offset, limit=pagination.per_page)
+        return self
+
+    @property
+    def query(self) -> FIND_MANY_QUERY:
+        return self._query
+
+    def clone(self) -> Self:
+        return copy.deepcopy(self)  # type: ignore
