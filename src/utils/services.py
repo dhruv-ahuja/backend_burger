@@ -4,6 +4,7 @@ from typing import Self, Type
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
+from fastapi import Body
 from loguru import logger
 import orjson
 import pymongo
@@ -61,7 +62,7 @@ async def delete_cached_data(key: str, redis_client: Redis) -> None:
 def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: list[SortSchema] | None) -> FIND_MANY_QUERY:
     """Parses, gathers and chains sort operations on the input query. Skips the process if sort input is empty."""
 
-    if sort is None:
+    if not isinstance(sort, list):
         return query
 
     sort_expressions = []
@@ -86,7 +87,7 @@ def filter_on_query(
     Maps the operation list to operator arguments that allow using the operator dynamically, to create expressions
     within the Beanie `find` method."""
 
-    if filter_ is None:
+    if not isinstance(filter_, list):
         return query
 
     operation_map = {
