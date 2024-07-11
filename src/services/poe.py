@@ -5,7 +5,9 @@ from loguru import logger
 from starlette import status
 
 from src.models.poe import Item, ItemCategory
-from src.schemas.poe import ItemBase, ItemCategoryResponse
+from src.schemas.poe import ItemBase, ItemGroupMapping, ItemCategoryResponse
+from src.schemas.requests import FilterSortInput, PaginationInput
+from src.utils.services import QueryChainer
 
 
 async def get_item_categories() -> list[ItemCategoryResponse]:
@@ -20,42 +22,75 @@ async def get_item_categories() -> list[ItemCategoryResponse]:
     return item_categories
 
 
-def group_item_categories(item_categories: list[ItemCategoryResponse]) -> dict[str, list[ItemCategoryResponse]]:
-    """Groups item category documents by their category group."""
+def group_item_categories(item_categories: list[ItemCategoryResponse]) -> list[ItemGroupMapping]:
+    """Gathers and groups categories by their parent groups, in a consistent hashmap format."""
 
-    item_category_mapping = defaultdict(list)
+    category_group_map = defaultdict(list)
+    item_category_groups: list[ItemGroupMapping] = []
 
     for category in item_categories:
-        item_category_mapping[category.group].append(category)
+        category_group_map[category.group].append(category)
 
-    return item_category_mapping
+    for group, members in category_group_map.items():
+        group: str
+        category_group_map = ItemGroupMapping(group=group, members=members)
+        item_category_groups.append(category_group_map)
+
+    return item_category_groups
 
 
-async def get_items_by_group(category_group: str) -> list[ItemBase]:
+async def get_items(
+    category_group: str | None, pagination: PaginationInput, filter_sort_input: FilterSortInput | None
+) -> tuple[list[ItemBase], int]:
     """
-    Gets items by given category group. Raises a 400 error if category group is invalid.
+    Gets items by given category group, and the total items' count in the database. Raises a 400 error if category
+    group is invalid.
     """
 
-    try:
-        item_category = await ItemCategory.find_one(ItemCategory.group == category_group)
-    except Exception as exc:
-        logger.error(f"error getting item category by group '{category_group}': {exc} ")
-        raise
+    item_category = None
+    if category_group is not None:
+        try:
+            item_category = await ItemCategory.find_one(ItemCategory.group == category_group)
+        except Exception as exc:
+            logger.error(f"error getting item category by group '{category_group}': {exc} ")
+            raise
+
+        if item_category is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid category group.")
 
     if item_category is None:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid category group.")
+        query = Item.find()
+    else:
+        query = Item.find(Item.category.group == category_group)  # type: ignore
+
+    chainer = QueryChainer(query, Item)
+
+    if filter_sort_input is None:
+        items_count = await query.find(fetch_links=True).count()
+        items = await chainer.paginate(pagination).query.find(fetch_links=True).project(ItemBase).to_list()
+
+        return items, items_count
+
+    base_query_chain = chainer.filter(filter_sort_input.filter_).sort(filter_sort_input.sort)
+
+    # * clone the query for use with total record counts and pagination calculations
+    count_query = (
+        base_query_chain.filter(filter_sort_input.filter_)
+        .sort(filter_sort_input.sort)
+        .clone()
+        .query.find(fetch_links=True)
+        .count()
+    )
+
+    paginated_query = base_query_chain.paginate(pagination).query.find(fetch_links=True).project(ItemBase).to_list()
 
     try:
-        items = (
-            await Item.find(
-                Item.category.group == category_group,  # type: ignore
-                fetch_links=True,
-            )
-            .project(ItemBase)
-            .to_list()
-        )
+        items = await paginated_query
+        items_count = await count_query
     except Exception as exc:
-        logger.error(f"error getting item by category group '{category_group}': {exc}")
+        logger.error(
+            f"error getting items from database category_group:'{category_group}'; filter_sort: {filter_sort_input}: {exc}"
+        )
         raise
 
-    return items
+    return items, items_count

@@ -4,7 +4,6 @@ from typing import Self, Type
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
-from fastapi import Body
 from loguru import logger
 import orjson
 import pymongo
