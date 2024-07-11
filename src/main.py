@@ -14,7 +14,7 @@ from src.config.exceptions import (
 )
 from src.config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
 from src.config.services import setup_services
-from src.routers import users, auth
+from src.routers import poe, users, auth
 from src.schemas.responses import BaseResponse
 
 
@@ -27,6 +27,7 @@ app = FastAPI(
 
 app.include_router(users.router)
 app.include_router(auth.router)
+app.include_router(poe.router)
 
 app.add_exception_handler(status.HTTP_400_BAD_REQUEST, handle_invalid_input_exception)
 app.add_exception_handler(RequestValidationError, handle_validation_exception)

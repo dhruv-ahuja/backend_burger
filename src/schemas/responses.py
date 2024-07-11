@@ -4,6 +4,8 @@ from fastapi.responses import ORJSONResponse
 from starlette import status
 from pydantic import BaseModel, Field, root_validator
 
+from src.config.constants.app import MAXIMUM_ITEMS_PER_PAGE
+
 
 # T represents any Pydantic BaseModel or Beanie Document, dict or list of BaseModel/Document or dict return types
 # TODO: define apt type constraints, currently failing with BaseModel constraint
@@ -53,7 +55,7 @@ class AppResponse(ORJSONResponse, Generic[T, E]):
         """Dumps Pydantic models or keeps content as is, passing it to the parent `__init__` function."""
 
         if isinstance(content, BaseResponse):
-            data = content.model_dump()
+            data = content.model_dump(mode="json")
         else:
             data = content
 
@@ -66,3 +68,12 @@ class AppResponse(ORJSONResponse, Generic[T, E]):
             return content
 
         return super().render(content)
+
+
+class PaginationResponse(BaseModel):
+    """PaginationResponse encapsulates pagination values required by the client."""
+
+    page: int = Field(gt=0)
+    per_page: int = Field(gt=0, le=MAXIMUM_ITEMS_PER_PAGE)
+    total_items: int
+    total_pages: int
