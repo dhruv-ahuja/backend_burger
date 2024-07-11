@@ -8,13 +8,18 @@ GET_CATEGORIES_RESPONSES: Dict[int | str, Dict[str, Any]] = {
         "content": {
             "application/json": {
                 "example": {
+                    "error": "null",
                     "data": {
-                        "Currency": [
-                            {"name": "Currency", "internal_name": "Currency", "group": "Currency"},
-                            {"name": "Fragments", "internal_name": "Fragment", "group": "Currency"},
+                        "category_groups": [
+                            {
+                                "group": "Currency",
+                                "members": [
+                                    {"name": "Currency", "internal_name": "Currency"},
+                                    {"name": "Fragments", "internal_name": "Fragment"},
+                                ],
+                            }
                         ]
                     },
-                    "error": None,
                 }
             }
         }

@@ -1,6 +1,7 @@
 import datetime as dt
 from decimal import Decimal
 from enum import Enum
+from typing import TypedDict
 
 from pydantic import BaseModel, Field, Json
 
@@ -32,7 +33,7 @@ class ItemCategoryResponse(BaseModel):
 
     name: str
     internal_name: str
-    group: str
+    group: str = Field(exclude=True)
 
 
 class ItemBase(BaseModel):
@@ -46,3 +47,10 @@ class ItemBase(BaseModel):
     variant: str | None = None
     icon_url: str | None = None
     enabled: bool = True
+
+
+class ItemGroupMapping(TypedDict):
+    """ItemGroupMapping maps Category instances to the group that they belong to, in a standardized format."""
+
+    group: str
+    members: list[ItemCategoryResponse]

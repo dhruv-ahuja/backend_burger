@@ -19,7 +19,7 @@ async def get_all_categories():
     item_categories = await service.get_item_categories()
     item_category_mapping = service.group_item_categories(item_categories)
 
-    return AppResponse(BaseResponse(data=item_category_mapping))
+    return AppResponse(BaseResponse(data=item_category_mapping, key="category_groups"))
 
 
 @router.get("/items", responses=resp.GET_ITEMS_RESPONSES)
