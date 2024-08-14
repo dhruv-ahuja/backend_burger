@@ -1,3 +1,4 @@
+import dotenv
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import ORJSONResponse
@@ -13,17 +14,19 @@ from src.config.exceptions import (
     handle_auth_exception,
 )
 from src.config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
-from src.config.services import setup_services
+from src.config.services import setup_services, initialize_logfire_services
 from src.routers import poe, users, auth
 from src.schemas.responses import BaseResponse
 
 
+dotenv.load_dotenv()
 newrelic.agent.initialize("./newrelic.ini")
 
 
 app = FastAPI(
     lifespan=setup_services, redirect_slashes=False, default_response_class=ORJSONResponse, title="Backend Burger"
 )
+initialize_logfire_services(app)
 
 app.include_router(users.router)
 app.include_router(auth.router)
