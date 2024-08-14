@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from boto3.resources.base import ServiceResource
 from fastapi import FastAPI
+import logfire
 from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 from mypy_boto3_logs.client import CloudWatchLogsClient
@@ -54,7 +55,6 @@ class Settings(BaseSettings):
     sqs_queue_name: str
 
     db_url: SecretStr
-
     jwt_secret_key: SecretStr
 
     redis_host: str
@@ -71,6 +71,15 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
         settings = Settings()  # type: ignore
 
     return settings
+
+
+def initialize_logfire_services(app: FastAPI) -> None:
+    """Initializes LogFire services by configuring and initializing its client, and registering requisite services."""
+
+    logfire.configure()
+    logfire.instrument_fastapi(app)
+    logfire.instrument_redis()
+    logfire.instrument_pymongo()
 
 
 def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
@@ -130,6 +139,8 @@ def initialize_logger(
         configuration["sink"] = filename
 
     logger.remove(0)
+    # adding logfire handler after registering its other services to ensure proper loguru setup
+    logger.configure(handlers=[logfire.loguru_handler()])
     logger.add(**configuration)
 
 
