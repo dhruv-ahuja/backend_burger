@@ -12,7 +12,7 @@ class PaginationInput(BaseModel):
     """PaginationInput encapsulates query parameters required for a paginated response."""
 
     page: int = Query(1, gt=0)
-    per_page: int = Query(ITEMS_PER_PAGE, gt=0, lte=MAXIMUM_ITEMS_PER_PAGE)
+    per_page: int = Query(ITEMS_PER_PAGE, gt=0, le=MAXIMUM_ITEMS_PER_PAGE)
 
     @computed_field
     @property
