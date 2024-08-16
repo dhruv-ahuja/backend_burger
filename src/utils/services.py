@@ -1,6 +1,6 @@
 import copy
 import operator
-from typing import Self, Type
+from typing import Self, Type, cast
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
@@ -10,7 +10,7 @@ import pymongo
 from redis.asyncio import Redis, RedisError
 
 from src.config.constants.app import FIND_MANY_QUERY
-from src.schemas.requests import FilterSchema, PaginationInput, SortSchema
+from src.schemas.requests import FilterInputType, FilterSchema, PaginationInput, SortInputType, SortSchema
 from src.schemas.responses import E, T, BaseResponse
 
 
@@ -58,9 +58,10 @@ async def delete_cached_data(key: str, redis_client: Redis) -> None:
         raise
 
 
-def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: list[SortSchema] | None) -> FIND_MANY_QUERY:
+def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInputType) -> FIND_MANY_QUERY:
     """Parses, gathers and chains sort operations on the input query. Skips the process if sort input is empty."""
 
+    sort = cast(list[SortSchema] | None, sort)
     if not isinstance(sort, list):
         return query
 
@@ -79,13 +80,12 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: list[Sort
     return query
 
 
-def filter_on_query(
-    query: FIND_MANY_QUERY, model: Type[Document], filter_: list[FilterSchema] | None
-) -> FIND_MANY_QUERY:
+def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: FilterInputType) -> FIND_MANY_QUERY:
     """Parses, gathers and chains filter operations on the input query. Skips the process if filter input is empty.\n
     Maps the operation list to operator arguments that allow using the operator dynamically, to create expressions
     within the Beanie `find` method."""
 
+    filter_ = cast(list[FilterSchema] | None, filter_)
     if not isinstance(filter_, list):
         return query
 
@@ -123,11 +123,11 @@ class QueryChainer:
         self._query = initial_query
         self.model = model
 
-    def sort(self, sort: list[SortSchema] | None) -> Self:
+    def sort(self, sort: SortInputType) -> Self:
         self._query = sort_on_query(self._query, self.model, sort)
         return self
 
-    def filter(self, filter_: list[FilterSchema] | None) -> Self:
+    def filter(self, filter_: FilterInputType) -> Self:
         filter_on_query(self._query, self.model, filter_)
         return self
 

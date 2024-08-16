@@ -26,10 +26,12 @@ async def get_all_categories():
 async def get_items_by_group(
     category_group: str | None = Query(None, min_length=3, max_length=50),
     pagination: PaginationInput = Depends(),  # using Depends allows us to encapsulate Query params within Pydantic models
-    filter_sort_input: FilterSortInput | None = None,
+    filter_: list[str] | None = Query(None, alias="filter"),
+    sort: list[str] | None = Query(None),
 ):
     """Gets a list of all items belonging to the given category group."""
 
+    filter_sort_input = FilterSortInput(sort=sort, filter=filter_)
     items, total_items = await service.get_items(category_group, pagination, filter_sort_input)
 
     response = create_pagination_response(items, total_items, pagination, "items")

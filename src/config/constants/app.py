@@ -27,7 +27,7 @@ USERS_CACHE_DURATION = 5 * 60
 ITEMS_PER_PAGE = 100
 MAXIMUM_ITEMS_PER_PAGE = 500
 
-SORT_OPERATIONS = Literal["asc", "desc"]
+SORT_OPERATION = Literal["asc", "desc"]
 FIND_MANY_QUERY = FindMany[FindType] | FindMany[DocumentProjectionType]
 
-FILTER_OPERATIONS = Literal["=", "!=", ">", ">=", "<", "<=", "like"]
+FILTER_OPERATION = Literal["=", "!=", ">", ">=", "<", "<=", "like"]
