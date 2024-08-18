@@ -13,7 +13,8 @@ import pydantic
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
-from src.models.poe import Item, ItemCategory, ItemIdType
+from src.models.poe import Item, ItemCategory
+from src.schemas.poe import ItemIdType
 
 
 @dataclass
