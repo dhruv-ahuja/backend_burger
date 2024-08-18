@@ -23,16 +23,15 @@ async def get_all_categories():
 
 
 @router.get("/items", responses=resp.GET_ITEMS_RESPONSES)
-async def get_items_by_group(
-    category_group: str | None = Query(None, min_length=3, max_length=50),
+async def get_items(
     pagination: PaginationInput = Depends(),  # using Depends allows us to encapsulate Query params within Pydantic models
     filter_: list[str] | None = Query(None, alias="filter"),
     sort: list[str] | None = Query(None),
 ):
-    """Gets a list of all items belonging to the given category group."""
+    """Gets a list of all items, modified by any given parameters."""
 
     filter_sort_input = FilterSortInput(sort=sort, filter=filter_)
-    items, total_items = await service.get_items(category_group, pagination, filter_sort_input)
+    items, total_items = await service.get_items(pagination, filter_sort_input)
 
     response = create_pagination_response(items, total_items, pagination, "items")
     return AppResponse(response)
