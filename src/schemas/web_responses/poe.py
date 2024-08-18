@@ -72,20 +72,6 @@ GET_ITEMS_RESPONSES: Dict[int | str, Dict[str, Any]] = {
             }
         }
     },
-    400: {
-        "content": {
-            "application/json": {
-                "example": {
-                    "error": {
-                        "type": "invalid_input",
-                        "message": "Invalid category group.",
-                        "fields": None,
-                    },
-                }
-            }
-        },
-        "data": None,
-    },
     422: {
         "content": {
             "application/json": {
