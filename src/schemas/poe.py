@@ -35,12 +35,13 @@ class ItemPrice(BaseModel):
     """ItemPrice holds information regarding the current, past and future price of an item.
     It stores the recent and predicted prices in a dictionary, with the date as the key."""
 
-    price: Annotated[Decimal, BeforeValidator(convert_current_price)]
-    currency: Currency
+    chaos_price: Annotated[Decimal, BeforeValidator(convert_current_price)]
+    divine_price: Annotated[Decimal, BeforeValidator(convert_current_price)]
     price_history: Annotated[dict[dt.datetime, Decimal], BeforeValidator(convert_decimal_values)]
     price_history_currency: Currency
     price_prediction: Annotated[dict[dt.datetime, Decimal], BeforeValidator(convert_decimal_values)]
     price_prediction_currency: Currency
+    low_confidence: bool = False
 
 
 class ItemCategoryResponse(BaseModel):
@@ -61,7 +62,9 @@ class ItemBase(BaseModel):
     type_: str | None = Field(None, serialization_alias="type")
     variant: str | None = None
     icon_url: str | None = None
-    enabled: bool = True
+    listings: int | None = None
+    links: int | None = None
+    # enabled: bool = True
 
 
 class ItemGroupMapping(TypedDict):
