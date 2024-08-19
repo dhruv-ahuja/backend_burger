@@ -51,8 +51,8 @@ class CurrencyItemEntity(BaseModel):
 
 
 class ItemSparkline(BaseModel):
-    data: list[Decimal]
-    totalChange: Decimal
+    data: list[Decimal | None]
+    totalChange: Decimal | None
 
 
 class ItemEntity(BaseModel):
@@ -71,7 +71,7 @@ class ItemEntity(BaseModel):
 
     @computed_field
     @property
-    def low_confidence(self):
+    def low_confidence(self) -> bool:
         low_confidence = False
 
         if len(self.sparkline.data) < 3 or self.listingCount < 10 and len(self.lowConfidenceSparkline.data) > 3:
@@ -84,7 +84,6 @@ CATEGORY_GROUP_MAP = {
     "Currency": [
         Category("Currency", "Currency"),
         Category("Fragments", "Fragment"),
-        Category("Coffins", "Coffin"),
         Category("Allflame Embers", "AllflameEmber"),
         Category("Tattoos", "Tattoo"),
         Category("Omens", "Omen"),
@@ -92,6 +91,7 @@ CATEGORY_GROUP_MAP = {
         Category("Artifacts", "Artifact"),
         Category("Oils", "Oil"),
         Category("Incubators", "Incubator"),
+        Category("Kalguuran Runes", "KalguuranRune"),
     ],
     "EquipmentAndGems": [
         Category("Unique Weapons", "UniqueWeapon"),
@@ -208,7 +208,8 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     endpoint, then parsing and returning the item data for the category."""
 
     api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
-    url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
+    league = "Settlers"
+    url = f"/{api_endpoint}?league={league}&type={internal_category_name}"
 
     item_data = []
     currency_item_metadata = []
@@ -304,7 +305,7 @@ def prepare_item_record(
             id_type=id_type,
             name=item_entity.currencyTypeName,
             type_=None,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_metadata.icon if item_metadata else None,
         )
 
@@ -314,7 +315,7 @@ def prepare_item_record(
             poe_ninja_id=item_entity.id_,
             name=item_entity.name,
             type_=item_entity.itemType,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_entity.icon,
             variant=item_entity.variant,
         )
