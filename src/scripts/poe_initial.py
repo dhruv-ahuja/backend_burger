@@ -1,6 +1,7 @@
 import asyncio
 from asyncio import Queue
 from dataclasses import dataclass
+from decimal import Decimal
 import json
 import os
 import time
@@ -8,7 +9,7 @@ from typing import Any, cast
 
 from httpx import AsyncClient, RequestError
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 import pydantic
 
 from src.config.services import connect_to_mongodb
@@ -49,6 +50,11 @@ class CurrencyItemEntity(BaseModel):
     metadata: CurrencyItemMetadata | None = None
 
 
+class ItemSparkline(BaseModel):
+    data: list[Decimal]
+    totalChange: Decimal
+
+
 class ItemEntity(BaseModel):
     id_: int = Field(alias="id")
     name: str
@@ -56,6 +62,22 @@ class ItemEntity(BaseModel):
     variant: str | None = None
     icon: str
     itemType: str | None = None
+    chaosValue: Decimal
+    divineValue: Decimal
+    listingCount: int
+    links: int | None = None
+    sparkline: ItemSparkline
+    lowConfidenceSparkline: ItemSparkline
+
+    @computed_field
+    @property
+    def low_confidence(self):
+        low_confidence = False
+
+        if len(self.sparkline.data) < 3 or self.listingCount < 10 and len(self.lowConfidenceSparkline.data) > 3:
+            low_confidence = True
+
+        return low_confidence
 
 
 CATEGORY_GROUP_MAP = {
