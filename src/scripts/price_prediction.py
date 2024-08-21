@@ -70,14 +70,12 @@ async def get_items(offset: int, limit: int) -> list[Item]:
         raise
 
 
-async def push_items_to_queue(batch_size: int, items_queue: Queue[list[Item] | None]) -> None:
+async def push_items_to_queue(total_items: int, batch_size: int, items_queue: Queue[list[Item] | None]) -> None:
     """Gets and pushes item data to queue. `items_queue` being a bounded queue ensures that this function only
     gets data from the database when necessary."""
 
     start = time.perf_counter()
-
     offset = 0
-    total_items = await Item.count()
 
     while offset < total_items:
         items = await get_items(offset, batch_size)
@@ -92,37 +90,54 @@ async def push_items_to_queue(batch_size: int, items_queue: Queue[list[Item] | N
     logger.info(f"time taken to get and push items to queue: {time.perf_counter() - start}; offset: {offset}")
 
 
+async def prepare_api_data(
+    item: Item, price_history_map: dict[Any, list[PriceHistoryEntity]], client: AsyncClient
+) -> None:
+    """Helper function to get and prepare Price History API data, and add it to the provided hashmap."""
+
+    item_id = item.poe_ninja_id
+    category = item.category
+
+    print(f"running for {item_id}, {category}")
+
+    if category in ("Currency", "Fragment"):
+        url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
+    else:
+        url = f"itemhistory?league={LEAGUE}&type={category}&itemId={item_id}"
+
+    try:
+        response = await client.get(url)
+        # response.raise_for_status()
+        price_history_api_data: list[dict] | dict[str, list[dict]] = response.json()
+    except HTTPError as exc:
+        logger.error(
+            f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
+        )
+        print(API_BASE_URL + "/" + url)
+        price_history_api_data = []
+
+    try:
+        if isinstance(price_history_api_data, dict):
+            price_history_api_data = price_history_api_data.pop("receiveCurrencyGraphData")
+        ta = TypeAdapter(list[PriceHistoryEntity])
+        price_history_data = ta.validate_python(price_history_api_data)
+    except pydantic.ValidationError as exc:
+        logger.error(
+            f"error parsing price history data for item_id {item_id} belonging to '{category}' category: {exc}"
+        )
+        price_history_data = []
+
+    print(f"ran for {item_id}, {category}")
+    price_history_map[item.id] = price_history_data
+
+
 async def get_price_history_data(
     items_queue: Queue[list[Item] | None], price_history_queue: Queue[dict[Any, list[PriceHistoryEntity]] | None]
 ) -> None:
     """Gets all available price history data for the available items, and parses them into a consistent schema.
     Maps and pushes the data into a queue for futher processing."""
 
-    async def prepare_api_data(url: str, client: AsyncClient) -> list[PriceHistoryEntity]:
-        try:
-            response = await client.get(url)
-            response.raise_for_status()
-            price_history_api_data: list[dict] | dict[str, list[dict]] = response.json()
-        except HTTPError as exc:
-            logger.error(
-                f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
-            )
-            price_history_api_data = []
-
-        try:
-            if isinstance(price_history_api_data, dict):
-                price_history_api_data = price_history_api_data.pop("receiveCurrencyGraphData")
-            ta = TypeAdapter(list[PriceHistoryEntity])
-            price_history_data = ta.validate_python(price_history_api_data)
-        except pydantic.ValidationError as exc:
-            logger.error(
-                f"error parsing price history data for item_id {item_id} belonging to '{category}' category: {exc}"
-            )
-            price_history_data = []
-
-        return price_history_data
-
-    data = {}
+    price_history_map = {}
 
     while True:
         items = await items_queue.get()
@@ -132,24 +147,30 @@ async def get_price_history_data(
             return
 
         start = time.perf_counter()
+        offset = 0
+        limit = 5
+        total_items = len(items[:30])  # TODO: revert this!
 
-        # creating client instance once per loop is optimal
         async with AsyncClient(base_url=API_BASE_URL) as client:
-            logger.debug(f"starting price history data fetch, len: {len(items)}")
-            # TODO: make 3-4 API calls in tandem
-            for item in items:
-                item_id = item.poe_ninja_id
-                category = item.category
+            async with asyncio.Semaphore(limit):
+                while offset < total_items:
+                    items_batch = items[offset : offset + limit]
 
-                if category in ("Currency", "Fragment"):
-                    url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
-                else:
-                    url = f"itemhistory?league={LEAGUE}&type={category}&itemId={item_id}"
+                    # create and await completion of this batch of items
+                    tasks = []
 
-                data[item.id] = await prepare_api_data(url, client)
-                logger.debug(f"fetched price data for {item.name}")
+                    for item in items_batch:
+                        tasks.append(asyncio.create_task(prepare_api_data(item, price_history_map, client)))
 
-            await price_history_queue.put(data)
+                    for task in tasks:
+                        await task
+
+                    offset += limit
+
+                    # * sleep to help avoid rate limiting, also ensures client remains available for API calls
+                    await asyncio.sleep(0.5)
+
+            await price_history_queue.put(price_history_map)
             logger.info(f"time taken to get price history data for batch: {time.perf_counter() - start}")
 
 
@@ -197,6 +218,40 @@ def predict_future_item_prices(price_history_data: list[PriceHistoryEntity], day
     # Predict future values using both models
     predictions = model_poly.predict(future_X_poly)
     return predictions
+
+
+async def manage_prediction_data(
+    price_history_queue: Queue[dict[Any, list[PriceHistoryEntity]] | None],
+    price_prediction_queue: Queue[dict[Any, list[ndarray]] | None],
+) -> None:
+    """Manages the flow of incoming price history queue data, predicting future prices based on that, and adds that to
+    the price prediction queue. Ensures that data is available for consumption down the chain."""
+
+    price_prediction_map = {}
+    # offset = 0
+
+    # push both price history queue and price_prediction items in one go, to make both the data sets available for saving into the db
+
+    while True:
+        price_history_map = await price_history_queue.get()
+        if price_history_map is None:
+            # signal end of production
+            await price_prediction_queue.put(None)
+            return
+
+        i = 0
+        start = time.perf_counter()
+        for item_id, price_history_data in price_history_map.items():
+            if i != 30:
+                price_prediction_data = predict_future_item_prices(price_history_data)
+
+                price_prediction_map[item_id] = price_history_data
+                print(item_id, price_prediction_data)
+
+                i += 1
+
+        await price_prediction_queue.put(price_prediction_map)
+        logger.debug(f"time taken to predict for current batch: {time.perf_counter() - start}")
 
 
 async def update_items_data(items: list[Item], iteration_count: int) -> None:
@@ -306,21 +361,23 @@ async def main():
     await connect_to_mongodb(document_models)
 
     start = time.perf_counter()
+    total_items = await Item.count()
+
     # TODO: remove this function
-    category_map = await get_and_map_categories()
+    # category_map = await get_and_map_categories()
 
-    item_price_history_data = []
-    item_price_prediction_data = []
-
-    # initiate requisite queues
-    # bounded queue ensures we only load data as needed
+    # * bounded queue ensures we only load data as needed
     items_queue: Queue[list[Item] | None] = Queue(maxsize=1)
     price_history_queue: Queue[dict[Any, list[PriceHistoryEntity]] | None] = Queue()
+    price_prediction_queue: Queue[dict[Any, list[ndarray]] | None] = Queue()
 
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(push_items_to_queue(BATCH_SIZE, items_queue))
+        tg.create_task(push_items_to_queue(total_items, BATCH_SIZE, items_queue))
         # tg.create_task(func(items_queue))
         tg.create_task(get_price_history_data(items_queue, price_history_queue))
+        tg.create_task(manage_prediction_data(price_history_queue, price_prediction_queue))
+
+    logger.warning(f"time taken for full flow: {time.perf_counter() - start}")
 
 
 async def add_item_price_data(
