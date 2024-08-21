@@ -78,9 +78,9 @@ class SortSchema(BaseModel):
                 if first_char == "-":
                     operation: SORT_OPERATION = "desc"
                     field = query_param[1:]
-                elif first_char == "+" or first_char.isalpha():
+                elif first_char.isalpha():
                     operation: SORT_OPERATION = "asc"
-                    field = query_param[1:] if first_char == "+" else query_param
+                    field = query_param
                 else:
                     valid_params = False
                     break

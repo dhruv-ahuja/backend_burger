@@ -1,8 +1,6 @@
 from collections import defaultdict
 
-from fastapi import HTTPException
 from loguru import logger
-from starlette import status
 
 from src.models.poe import Item, ItemCategory
 from src.schemas.poe import ItemBase, ItemGroupMapping, ItemCategoryResponse
@@ -40,29 +38,11 @@ def group_item_categories(item_categories: list[ItemCategoryResponse]) -> list[I
 
 
 async def get_items(
-    category_group: str | None, pagination: PaginationInput, filter_sort_input: FilterSortInput | None
+    pagination: PaginationInput, filter_sort_input: FilterSortInput | None
 ) -> tuple[list[ItemBase], int]:
-    """
-    Gets items by given category group, and the total items' count in the database. Raises a 400 error if category
-    group is invalid.
-    """
+    """Gets items by given category group, and the total items' count in the database."""
 
-    item_category = None
-    if category_group is not None:
-        try:
-            item_category = await ItemCategory.find_one(ItemCategory.group == category_group)
-        except Exception as exc:
-            logger.error(f"error getting item category by group '{category_group}': {exc} ")
-            raise
-
-        if item_category is None:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid category group.")
-
-    if item_category is None:
-        query = Item.find()
-    else:
-        query = Item.find(Item.category.group == category_group)  # type: ignore
-
+    query = Item.find()
     chainer = QueryChainer(query, Item)
 
     if filter_sort_input is None:
@@ -88,9 +68,7 @@ async def get_items(
         items = await paginated_query
         items_count = await count_query
     except Exception as exc:
-        logger.error(
-            f"error getting items from database category_group:'{category_group}'; filter_sort: {filter_sort_input}: {exc}"
-        )
+        logger.error(f"error getting items from database; filter_sort: {filter_sort_input}: {exc}")
         raise
 
     return items, items_count

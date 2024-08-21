@@ -1,5 +1,3 @@
-from beanie import Link
-
 from src.models.common import DateMetadataDocument
 from src.schemas.poe import ItemBase
 
@@ -22,7 +20,7 @@ class Item(ItemBase, DateMetadataDocument):
     """Item represents a Path of Exile in-game item. Each item belongs to a category. It contains information such as
     item type and the current, past and predicted pricing, encapsulated in the `ItemPrice` schema."""
 
-    category: Link[ItemCategory]
+    category: str | None = None
 
     class Settings:
         """Defines the settings for the collection."""

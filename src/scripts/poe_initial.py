@@ -1,6 +1,7 @@
 import asyncio
 from asyncio import Queue
 from dataclasses import dataclass
+from decimal import Decimal
 import json
 import os
 import time
@@ -8,12 +9,13 @@ from typing import Any, cast
 
 from httpx import AsyncClient, RequestError
 from loguru import logger
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 import pydantic
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
-from src.models.poe import Item, ItemCategory, ItemIdType
+from src.models.poe import Item, ItemCategory
+from src.schemas.poe import ItemIdType, ItemPrice
 
 
 @dataclass
@@ -30,6 +32,11 @@ class ApiItemData:
 
 
 # * these encapsulate required currency and item data for each entry from API responses
+class ItemSparkline(BaseModel):
+    data: list[Decimal | None]
+    totalChange: Decimal | None
+
+
 class CurrencyItemMetadata(BaseModel):
     id_: int = Field(alias="id")
     icon: str | None = None
@@ -38,14 +45,19 @@ class CurrencyItemMetadata(BaseModel):
 class CurrencyItemEntity(BaseModel):
     class Pay(BaseModel):
         pay_currency_id: int
+        listing_count: int = 0
 
     class Receive(BaseModel):
         get_currency_id: int
+        listing_count: int = 0
 
     currencyTypeName: str
     pay: Pay | None = None
     receive: Receive | None = None
     metadata: CurrencyItemMetadata | None = None
+    # paySparkLine: ItemSparkline | None = None
+    # receiveSparkLine: ItemSparkline | None = None
+    chaosEquivalent: Decimal = Decimal(0)
 
 
 class ItemEntity(BaseModel):
@@ -55,13 +67,28 @@ class ItemEntity(BaseModel):
     variant: str | None = None
     icon: str
     itemType: str | None = None
+    chaosValue: Decimal = Decimal(0)
+    divineValue: Decimal = Decimal(0)
+    links: int | None = None
+    listingCount: int = 0
+    sparkline: ItemSparkline
+    lowConfidenceSparkline: ItemSparkline
+
+    @computed_field
+    @property
+    def low_confidence(self) -> bool:
+        low_confidence = False
+
+        if len(self.sparkline.data) < 3 or self.listingCount < 10 and len(self.lowConfidenceSparkline.data) > 3:
+            low_confidence = True
+
+        return low_confidence
 
 
 CATEGORY_GROUP_MAP = {
     "Currency": [
         Category("Currency", "Currency"),
         Category("Fragments", "Fragment"),
-        Category("Coffins", "Coffin"),
         Category("Allflame Embers", "AllflameEmber"),
         Category("Tattoos", "Tattoo"),
         Category("Omens", "Omen"),
@@ -69,6 +96,7 @@ CATEGORY_GROUP_MAP = {
         Category("Artifacts", "Artifact"),
         Category("Oils", "Oil"),
         Category("Incubators", "Incubator"),
+        Category("Kalguuran Runes", "KalguuranRune"),
     ],
     "EquipmentAndGems": [
         Category("Unique Weapons", "UniqueWeapon"),
@@ -185,7 +213,8 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     endpoint, then parsing and returning the item data for the category."""
 
     api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
-    url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
+    league = "Settlers"
+    url = f"/{api_endpoint}?league={league}&type={internal_category_name}"
 
     item_data = []
     currency_item_metadata = []
@@ -268,12 +297,16 @@ def prepare_item_record(
         if item_entity.pay is not None:
             poe_ninja_id = item_entity.pay.pay_currency_id
             id_type = ItemIdType.pay
+            listings = item_entity.pay.listing_count
         elif item_entity.receive is not None:
             poe_ninja_id = item_entity.receive.get_currency_id
             id_type = ItemIdType.receive
+            listings = item_entity.receive.listing_count
         else:
             logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
             return
+
+        price_info = ItemPrice(chaos_price=item_entity.chaosEquivalent, listings=listings)
 
         item_metadata = item_entity.metadata
         item_record = Item(
@@ -281,19 +314,29 @@ def prepare_item_record(
             id_type=id_type,
             name=item_entity.currencyTypeName,
             type_=None,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_metadata.icon if item_metadata else None,
+            price_info=price_info,
         )
 
     else:
         item_entity = cast(ItemEntity, item_entity)
+
+        price_info = ItemPrice(
+            chaos_price=item_entity.chaosValue,
+            divine_price=item_entity.divineValue,
+            listings=item_entity.listingCount,
+            low_confidence=item_entity.low_confidence,
+        )
         item_record = Item(
             poe_ninja_id=item_entity.id_,
             name=item_entity.name,
             type_=item_entity.itemType,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_entity.icon,
             variant=item_entity.variant,
+            links=item_entity.links,
+            price_info=price_info,
         )
 
     return item_record
