@@ -1,9 +1,8 @@
 import asyncio
-from asyncio import Queue
 import datetime as dt
 from decimal import Decimal
 import time
-from typing import Annotated, Any
+from typing import Annotated
 
 from httpx import AsyncClient, HTTPError
 from loguru import logger
@@ -24,11 +23,10 @@ from src.models import document_models
 from src.models.poe import Item, ItemCategory
 from src.schemas.poe import Currency, ItemPrice
 
-# TODO: handle extreme decimal case scenarios for items like Mirror of Kalandra
 
 API_BASE_URL = "https://poe.ninja/api/data"
+
 BATCH_SIZE = 500
-LEAGUE = "Settlers"
 
 
 # schema logic
@@ -46,6 +44,17 @@ class PriceHistoryEntity(BaseModel):
         return now - dt.timedelta(self.days_ago)
 
 
+async def get_items(offset: int) -> list[Item]:
+    """Gets all Items from the database."""
+
+    try:
+        # avoiding links here as each object will fetch its own category record
+        return await Item.find_all(skip=offset, limit=BATCH_SIZE).to_list()
+    except Exception as exc:
+        logger.error(f"error getting items with offset {offset}: {exc}")
+        raise
+
+
 async def get_and_map_categories() -> dict[str, ItemCategory]:
     """Gets and maps category model instances to their Ids."""
 
@@ -55,102 +64,69 @@ async def get_and_map_categories() -> dict[str, ItemCategory]:
         logger.error(f"error getting item categories: {exc}")
         raise
 
-    category_map = {category.internal_name: category for category in categories}
+    category_map = {str(category.id): category for category in categories}
     return category_map
 
 
-async def get_items(offset: int, limit: int) -> list[Item]:
-    """Gets all Items from the database."""
+async def update_items_data(items: list[Item], iteration_count: int) -> None:
+    """Bulk-updates item data in the database. Serializes item price schema into a JSON object for insertion into
+    the database. Creates an order of Pymongo-native `UpdateOne` operations and bulk writes them for efficiency over
+    inserting each record one-by-one."""
+
+    bulk_operations = []
+    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()
+
+    for item in items:
+        item_price_json = item.price.model_dump_json() if item.price else None
+
+        bulk_operations.append(
+            pymongo.UpdateOne(
+                {"_id": item.id},
+                {
+                    "$set": {"price": item_price_json, "updated_date": dt.datetime.now(dt.UTC)},
+                },
+            )
+        )
 
     try:
-        # avoiding links here as each object will fetch its own category record
-        return await Item.find_all(skip=offset, limit=limit).to_list()
+        result = await item_collection.bulk_write(bulk_operations)
+        logger.info(f"result from batch number {iteration_count}'s bulk update:", result)
     except Exception as exc:
-        logger.error(f"error getting items with offset {offset}: {exc}")
-        raise
+        logger.error(f"error bulk writing: {exc}")
+        logger.error(f"{type(exc)}")
 
 
-async def push_items_to_queue(batch_size: int, items_queue: Queue[list[Item] | None]) -> None:
-    """Gets and pushes item data to queue. `items_queue` being a bounded queue ensures that this function only
-    gets data from the database when necessary."""
+async def get_price_history_data(category_internal_name: str, item_id: int) -> list[PriceHistoryEntity]:
+    """Gets all available price history data for the given item_id, and parses it into a consistent schema model."""
 
-    start = time.perf_counter()
+    if category_internal_name in ("Currency", "Fragment"):
+        url = f"/currencyhistory?league=Necropolis&type={category_internal_name}&currencyId={item_id}"
+    else:
+        url = f"/itemhistory?league=Necropolis&type={category_internal_name}&itemId={item_id}"
 
-    offset = 0
-    total_items = await Item.count()
-
-    while offset < total_items:
-        items = await get_items(offset, batch_size)
-        await items_queue.put(items)
-
-        offset += batch_size
-        logger.info(f"pushed items data till offset {offset}")
-
-    # push sentinel value
-    await items_queue.put(None)
-
-    logger.info(f"time taken to get and push items to queue: {time.perf_counter() - start}; offset: {offset}")
-
-
-async def get_price_history_data(
-    items_queue: Queue[list[Item] | None], price_history_queue: Queue[dict[Any, list[PriceHistoryEntity]] | None]
-) -> None:
-    """Gets all available price history data for the available items, and parses them into a consistent schema.
-    Maps and pushes the data into a queue for futher processing."""
-
-    async def prepare_api_data(url: str, client: AsyncClient) -> list[PriceHistoryEntity]:
+    async with AsyncClient(base_url=API_BASE_URL) as client:
         try:
             response = await client.get(url)
             response.raise_for_status()
             price_history_api_data: list[dict] | dict[str, list[dict]] = response.json()
         except HTTPError as exc:
             logger.error(
-                f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
+                f"error getting price history data for item_id {item_id} belonging to '{category_internal_name}' category: {exc}"
             )
-            price_history_api_data = []
+            return []
 
-        try:
-            if isinstance(price_history_api_data, dict):
-                price_history_api_data = price_history_api_data.pop("receiveCurrencyGraphData")
-            ta = TypeAdapter(list[PriceHistoryEntity])
-            price_history_data = ta.validate_python(price_history_api_data)
-        except pydantic.ValidationError as exc:
-            logger.error(
-                f"error parsing price history data for item_id {item_id} belonging to '{category}' category: {exc}"
-            )
-            price_history_data = []
+    try:
+        if isinstance(price_history_api_data, dict):
+            price_history_api_data = price_history_api_data.pop("receiveCurrencyGraphData")
+        ta = TypeAdapter(list[PriceHistoryEntity])
+        price_history_data = ta.validate_python(price_history_api_data)
+    except pydantic.ValidationError as exc:
+        logger.error(
+            f"error parsing price history data for item_id {item_id} belonging to '{category_internal_name}' category: {exc}"
+        )
+        return []
 
-        return price_history_data
-
-    data = {}
-
-    while True:
-        items = await items_queue.get()
-        if items is None:
-            # signal end of production
-            await price_history_queue.put(None)
-            return
-
-        start = time.perf_counter()
-
-        # creating client instance once per loop is optimal
-        async with AsyncClient(base_url=API_BASE_URL) as client:
-            logger.debug(f"starting price history data fetch, len: {len(items)}")
-            # TODO: make 3-4 API calls in tandem
-            for item in items:
-                item_id = item.poe_ninja_id
-                category = item.category
-
-                if category in ("Currency", "Fragment"):
-                    url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
-                else:
-                    url = f"itemhistory?league={LEAGUE}&type={category}&itemId={item_id}"
-
-                data[item.id] = await prepare_api_data(url, client)
-                logger.debug(f"fetched price data for {item.name}")
-
-            await price_history_queue.put(data)
-            logger.info(f"time taken to get price history data for batch: {time.perf_counter() - start}")
+    return price_history_data
 
 
 def predict_future_item_prices(price_history_data: list[PriceHistoryEntity], days: int = 4) -> ndarray:
@@ -199,35 +175,7 @@ def predict_future_item_prices(price_history_data: list[PriceHistoryEntity], day
     return predictions
 
 
-async def update_items_data(items: list[Item], iteration_count: int) -> None:
-    """Bulk-updates item data in the database. Serializes item price schema into a JSON object for insertion into
-    the database. Creates an order of Pymongo-native `UpdateOne` operations and bulk writes them for efficiency over
-    inserting each record one-by-one."""
-
-    bulk_operations = []
-    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
-
-    for item in items:
-        serialized_data = item.price_info.serialize() if item.price_info else {}
-
-        bulk_operations.append(
-            pymongo.UpdateOne(
-                {"_id": item.id},
-                {
-                    "$set": {"price_info": serialized_data, "updated_time": dt.datetime.now(dt.UTC)},
-                },
-            )
-        )
-
-    try:
-        result = await item_collection.bulk_write(bulk_operations)
-        logger.info(f"result from batch number {iteration_count}'s bulk update: {result}")
-    except Exception as exc:
-        logger.error(f"error bulk writing: {exc}")
-        logger.error(f"{type(exc)}")
-
-
-async def main_old():
+async def main():
     offset = iteration_count = 0
 
     await connect_to_mongodb(document_models)
@@ -240,42 +188,26 @@ async def main_old():
 
     total_items = await Item.count()
 
-    # initiate requisite queues
-    # bounded queue ensures we only load data as needed
-    items_queue: Queue[list[Item] | None] = Queue(maxsize=1)
-
     while offset < total_items:
-        s = batch_start = time.perf_counter()
-        items = await get_items(offset, BATCH_SIZE)
-        t = time.perf_counter()
-        print(f"{t -s} to fetch items till {offset}")
+        batch_start = time.perf_counter()
+        items = await get_items(offset)
 
-        for item in items[:20]:
-            s2 = time.perf_counter()
-            category_key = item.category if item.category else ""
+        for item in items:
+            item_category_id = str(item.category.ref.id)
             try:
-                item_category = category_map[category_key]
+                item_category = category_map[item_category_id]
             except KeyError:
-                logger.error(f"item category not found for '{item.name}' item")
+                logger.error(f"item category not found for '{item.name}' item with category id: {item_category_id}")
                 continue
 
             price_history_data = await get_price_history_data(item_category.internal_name, item.poe_ninja_id)
 
             item_price_history_data.append(price_history_data)
 
-            print(f"{time.perf_counter() - s2} to fetch price hisotry data")
-
-            s2 = time.perf_counter()
-
             price_predictions = predict_future_item_prices(price_history_data)
             item_price_prediction_data.append(price_predictions)
 
-            print(f"{time.perf_counter() - s2} to predict future data")
-
-            s2 = time.perf_counter()
             await add_item_price_data(items, price_history_data, item_price_prediction_data)
-
-            print(f"{time.perf_counter() - s2} for updating data")
 
         await update_items_data(items, iteration_count)
         batch_stop = time.perf_counter()
@@ -287,40 +219,8 @@ async def main_old():
         offset += BATCH_SIZE
         iteration_count += 1
 
-        break
-
     stop = time.perf_counter()
     logger.info(f"total time taken for predicting prices of {total_items}: {stop - start}")
-
-
-async def func(q: Queue):
-    await asyncio.sleep(2)
-    i = await q.get()
-    while i is not None:
-        logger.info("going 2 sleep")
-        await asyncio.sleep(1)
-        i = await q.get()
-
-
-async def main():
-    await connect_to_mongodb(document_models)
-
-    start = time.perf_counter()
-    # TODO: remove this function
-    category_map = await get_and_map_categories()
-
-    item_price_history_data = []
-    item_price_prediction_data = []
-
-    # initiate requisite queues
-    # bounded queue ensures we only load data as needed
-    items_queue: Queue[list[Item] | None] = Queue(maxsize=1)
-    price_history_queue: Queue[dict[Any, list[PriceHistoryEntity]] | None] = Queue()
-
-    async with asyncio.TaskGroup() as tg:
-        tg.create_task(push_items_to_queue(BATCH_SIZE, items_queue))
-        # tg.create_task(func(items_queue))
-        tg.create_task(get_price_history_data(items_queue, price_history_queue))
 
 
 async def add_item_price_data(
@@ -350,15 +250,15 @@ async def add_item_price_data(
             previous_date = entity.convert_days_ago_to_date()
             price_history_mapping[previous_date] = entity.value
 
-        # TODO: check for low confidence
         item_price_data = ItemPrice(
-            chaos_price=todays_price_data.value,
+            price=todays_price_data.value,
+            currency=Currency.chaos,
             price_history=price_history_mapping,
             price_history_currency=Currency.chaos,
             price_prediction=price_prediction_mapping,
             price_prediction_currency=Currency.chaos,
         )
-        item.price_info = item_price_data
+        item.price = item_price_data
 
 
 if __name__ == "__main__":
