@@ -1,4 +1,5 @@
 import datetime as dt
+from decimal import Decimal
 import subprocess
 
 
@@ -6,6 +7,7 @@ from apscheduler.job import Job
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from bson import Decimal128
 from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
 
@@ -75,3 +77,25 @@ def schedule_price_prediction_run(scheduler: AsyncIOScheduler) -> Job:
     logger.info(f"scheduled '{job_id}' job to run daily")
 
     return job
+
+
+def convert_decimal(dict_item: dict | None):
+    """This function iterates a dictionary looking for types of Decimal and converts them to Decimal128
+    Embedded dictionaries and lists are called recursively.
+
+    See: https://stackoverflow.com/questions/61456784/pymongo-cannot-encode-object-of-type-decimal-decimal"""
+
+    if dict_item is None:
+        return None
+
+    # for k,v in list(dict_item.items()):
+    for key, value in dict_item.items():
+        if isinstance(value, dict):
+            convert_decimal(value)
+        elif isinstance(value, list):
+            for entry in value:
+                convert_decimal(entry)
+        elif isinstance(value, Decimal):
+            dict_item[key] = Decimal128(str(value))
+
+    return dict_item
