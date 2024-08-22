@@ -59,6 +59,7 @@ class Settings(BaseSettings):
 
     redis_host: str
     redis_password: SecretStr | None = None
+    app_environment: str
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -75,6 +76,10 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
 
 def initialize_logfire_services(app: FastAPI) -> None:
     """Initializes LogFire services by configuring and initializing its client, and registering requisite services."""
+
+    # skip as requisite env vars wont be available
+    if settings.app_environment == "github_workflow":
+        return
 
     logfire.configure()
     logfire.instrument_fastapi(app)
