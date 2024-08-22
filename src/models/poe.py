@@ -20,7 +20,7 @@ class Item(ItemBase, DateMetadataDocument):
     """Item represents a Path of Exile in-game item. Each item belongs to a category. It contains information such as
     item type and the current, past and predicted pricing, encapsulated in the `ItemPrice` schema."""
 
-    category: str | None = None
+    category: str
 
     class Settings:
         """Defines the settings for the collection."""
