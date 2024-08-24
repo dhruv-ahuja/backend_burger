@@ -33,7 +33,6 @@ SORT_OPERATION = Literal["asc", "desc"]
 FIND_MANY_QUERY = FindMany[FindType] | FindMany[DocumentProjectionType]
 
 FILTER_OPERATION = Literal["=", "!=", ">", ">=", "<", "<=", "like"]
-
 FILTER_OPERATION_MAP = {
     "=": operator.eq,
     "!=": operator.ne,
@@ -42,4 +41,11 @@ FILTER_OPERATION_MAP = {
     ">=": operator.ge,
     "<=": operator.le,
     "like": RegExOperator,
+}
+NESTED_FILTER_OPERATION_MAP = {
+    "=": "$eq",
+    ">": "$gt",
+    ">=": "$gte",
+    "<": "$lt",
+    "<=": "$lte",
 }

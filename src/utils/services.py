@@ -3,12 +3,13 @@ from typing import Self, Type, cast
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
+from bson import Decimal128
 from loguru import logger
 import orjson
 import pymongo
 from redis.asyncio import Redis, RedisError
 
-from src.config.constants.app import FILTER_OPERATION_MAP, FIND_MANY_QUERY
+from src.config.constants.app import FILTER_OPERATION_MAP, FIND_MANY_QUERY, NESTED_FILTER_OPERATION_MAP
 from src.schemas.requests import FilterInputType, FilterSchema, PaginationInput, SortInputType, SortSchema
 from src.schemas.responses import E, T, BaseResponse
 
@@ -79,6 +80,23 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput
     return query
 
 
+def _build_nested_query(entry: FilterSchema, query: FIND_MANY_QUERY) -> FIND_MANY_QUERY:
+    """Builds queries for nested fields, using raw BSON query syntax to ensure nested fields are parsed properly."""
+
+    field = entry.field
+    operation = entry.operation
+    value = entry.value
+
+    if operation != "like":
+        operation_function = NESTED_FILTER_OPERATION_MAP[operation]
+        filter_query = {field: {operation_function: Decimal128(value)}}
+    else:
+        filter_query = {field: {"$regex": value, "$options": "i"}}
+
+    query = query.find(filter_query)
+    return query
+
+
 def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: FilterInputType) -> FIND_MANY_QUERY:
     """Parses, gathers and chains filter operations on the input query. Skips the process if filter input is empty.\n
     Maps the operation list to operator arguments that allow using the operator dynamically, to create expressions
@@ -94,15 +112,19 @@ def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: Filt
         operation_function = FILTER_OPERATION_MAP[operation]
         value = entry.value
 
-        model_field = getattr(model, field)
-
-        if operation != "like":
-            query = query.find(operation_function(model_field, value))
+        is_nested = "." in field
+        if is_nested:
+            query = _build_nested_query(entry, query)
         else:
-            operation_function = RegExOperator
-            options = "i"  # case-insensitive search
+            model_field = getattr(model, field)
 
-            query = query.find(operation_function(model_field, value, options=options))
+            if operation != "like":
+                query = query.find(operation_function(model_field, value))
+            else:
+                operation_function = RegExOperator
+                options = "i"  # case-insensitive search
+
+                query = query.find(operation_function(model_field, value, options=options))
 
     return query
 

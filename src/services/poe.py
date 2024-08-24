@@ -42,30 +42,24 @@ async def get_items(
 ) -> tuple[list[ItemBase], int]:
     """Gets items by given category group, and the total items' count in the database."""
 
-    query = Item.find()
-    chainer = QueryChainer(query, Item)
-
     if filter_sort_input is None:
-        items_count = await query.find(fetch_links=True).count()
-        items = await chainer.paginate(pagination).query.find(fetch_links=True).project(ItemBase).to_list()
+        items_count = await Item.find().count()
+        items = await QueryChainer(Item.find(), Item).paginate(pagination).query.find().project(ItemBase).to_list()
 
         return items, items_count
 
-    base_query_chain = chainer.filter(filter_sort_input.filter_).sort(filter_sort_input.sort)
-
-    # * clone the query for use with total record counts and pagination calculations
-    count_query = (
-        base_query_chain.filter(filter_sort_input.filter_)
+    items_query = (
+        QueryChainer(Item.find(), Item)
+        .filter(filter_sort_input.filter_)
         .sort(filter_sort_input.sort)
-        .clone()
-        .query.find(fetch_links=True)
-        .count()
+        .paginate(pagination)
+        .query.project(ItemBase)
+        .to_list()
     )
-
-    paginated_query = base_query_chain.paginate(pagination).query.find(fetch_links=True).project(ItemBase).to_list()
+    count_query = QueryChainer(Item.find(), Item).filter(filter_sort_input.filter_).query.count()
 
     try:
-        items = await paginated_query
+        items = await items_query
         items_count = await count_query
     except Exception as exc:
         logger.error(f"error getting items from database; filter_sort: {filter_sort_input}: {exc}")
