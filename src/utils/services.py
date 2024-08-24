@@ -71,7 +71,8 @@ def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInput
         field = entry.field
         operation = pymongo.ASCENDING if entry.operation == "asc" else pymongo.DESCENDING
 
-        model_field = getattr(model, field)
+        is_nested = "." in field
+        model_field = field if is_nested else getattr(model, field)
         expression = (model_field, operation)
 
         sort_expressions.append(expression)
