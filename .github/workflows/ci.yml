@@ -24,6 +24,7 @@ env:
     S3_BUCKET_NAME: ${{secrets.S3_BUCKET_NAME}}
     S3_LOGS_FOLDER: ${{secrets.S3_LOGS_FOLDER}}
     REDIS_HOST: localhost
+    APP_ENVIRONMENT: github_workflow
 
 jobs:
     build:

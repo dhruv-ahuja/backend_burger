@@ -11,6 +11,9 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+env:
+    APP_ENVIRONMENT: github_workflow
+
 jobs:
     deploy:
         runs-on: ubuntu-latest
