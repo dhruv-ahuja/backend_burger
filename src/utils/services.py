@@ -1,5 +1,4 @@
 import copy
-import operator
 from typing import Self, Type, cast
 
 from beanie import Document
@@ -9,7 +8,7 @@ import orjson
 import pymongo
 from redis.asyncio import Redis, RedisError
 
-from src.config.constants.app import FIND_MANY_QUERY
+from src.config.constants.app import FILTER_OPERATION_MAP, FIND_MANY_QUERY
 from src.schemas.requests import FilterInputType, FilterSchema, PaginationInput, SortInputType, SortSchema
 from src.schemas.responses import E, T, BaseResponse
 
@@ -89,20 +88,10 @@ def filter_on_query(query: FIND_MANY_QUERY, model: Type[Document], filter_: Filt
     if not isinstance(filter_, list):
         return query
 
-    operation_map = {
-        "=": operator.eq,
-        "!=": operator.ne,
-        ">": operator.gt,
-        "<": operator.lt,
-        ">=": operator.ge,
-        "<=": operator.le,
-        "like": RegExOperator,
-    }
-
     for entry in filter_:
         field = entry.field
         operation = entry.operation
-        operation_function = operation_map[operation]
+        operation_function = FILTER_OPERATION_MAP[operation]
         value = entry.value
 
         model_field = getattr(model, field)

@@ -1,8 +1,10 @@
 from typing import Literal
 from uuid import uuid4
 import datetime as dt
+import operator
 
 from beanie.odm.interfaces.find import FindType, DocumentProjectionType
+from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
 from beanie.odm.queries.find import FindMany
 
 
@@ -31,3 +33,13 @@ SORT_OPERATION = Literal["asc", "desc"]
 FIND_MANY_QUERY = FindMany[FindType] | FindMany[DocumentProjectionType]
 
 FILTER_OPERATION = Literal["=", "!=", ">", ">=", "<", "<=", "like"]
+
+FILTER_OPERATION_MAP = {
+    "=": operator.eq,
+    "!=": operator.ne,
+    ">": operator.gt,
+    "<": operator.lt,
+    ">=": operator.ge,
+    "<=": operator.le,
+    "like": RegExOperator,
+}
