@@ -275,7 +275,7 @@ async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None])
 
         for item in updated_items:
             assert item.price_info is not None
-            serialized_data = item.price_info.serialize()
+            serialized_data = item.price_info.serialize_price_data()
 
             bulk_operations.append(
                 pymongo.UpdateOne(

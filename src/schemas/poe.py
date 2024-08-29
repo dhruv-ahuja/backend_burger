@@ -19,7 +19,7 @@ def convert_decimal_values(values: dict[dt.datetime, str | Decimal128 | Decimal]
     return converted_values
 
 
-def convert_current_price(value: Decimal | Decimal128 | str) -> Decimal:
+def convert_decimal_value(value: Decimal | Decimal128 | str) -> Decimal:
     return value.to_decimal() if isinstance(value, Decimal128) else Decimal(value)
 
 
@@ -33,31 +33,42 @@ class ItemIdType(str, Enum):
     receive = "receive"
 
 
+class PriceDatedData(BaseModel):
+    """PriceDatedData encapsulates an instance of a timestamp and item value."""
+
+    timestamp: dt.datetime
+    price: Annotated[Decimal, BeforeValidator(convert_decimal_value)]
+
+
 class ItemPrice(BaseModel):
     """ItemPrice holds information regarding the current, past and future price of an item.
     It stores the recent and predicted prices in a dictionary, with the date as the key."""
 
-    chaos_price: Annotated[Decimal, BeforeValidator(convert_current_price)] = Decimal(0)
-    divine_price: Annotated[Decimal, BeforeValidator(convert_current_price)] = Decimal(0)
-    price_history: Annotated[dict[dt.datetime, Decimal], BeforeValidator(convert_decimal_values)] = {}
+    chaos_price: Annotated[Decimal, BeforeValidator(convert_decimal_value)] = Decimal(0)
+    divine_price: Annotated[Decimal, BeforeValidator(convert_decimal_value)] = Decimal(0)
+    price_history: list[PriceDatedData] | None = None
     price_history_currency: Currency = Currency.chaos
-    price_prediction: Annotated[dict[dt.datetime, Decimal], BeforeValidator(convert_decimal_values)] = {}
+    price_prediction: list[PriceDatedData] | None = None
     price_prediction_currency: Currency = Currency.chaos
     low_confidence: bool = False
     listings: int = 0
 
-    def serialize(self) -> dict:
+    def serialize_price_data(self) -> dict:
         """Serializes the object instance's data, making it compatible with MongoDB. Converts Decimal values into
         Decimal128 values and datetime keys into string keys."""
 
-        price_history = self.price_history
-        price_prediction = self.price_prediction
+        price_history = self.price_history if self.price_history else []
+        price_prediction = self.price_prediction if self.price_prediction else []
 
         serialized_data = self.model_dump()
 
         # convert datetime keys into string variants
-        serialized_data["price_history"] = {str(k): v for k, v in price_history.items()}
-        serialized_data["price_prediction"] = {str(k): v for k, v in price_prediction.items()}
+        serialized_data["price_history_new"] = [
+            {"timestamp": str(entry.timestamp), "price": entry.price} for entry in price_history
+        ]
+        serialized_data["price_prediction_new"] = [
+            {"timestamp": str(entry.timestamp), "price": entry.price} for entry in price_prediction
+        ]
 
         # convert decimal types into Decimal128 types and cast the output as dictionary
         serialized_data = convert_decimal(serialized_data)
