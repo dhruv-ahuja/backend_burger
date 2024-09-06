@@ -46,4 +46,4 @@ RUN mkdir -p /home/myuser/log
 EXPOSE 8000
 
 # using /dev/shm as the worker temp dir will help prevent random locks and freezes used for gunicorn heartbeat
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]
