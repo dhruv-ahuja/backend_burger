@@ -12,8 +12,10 @@ import beanie
 import beanie.operators
 from httpx import AsyncClient, RequestError
 from loguru import logger
+import motor
 from pydantic import BaseModel, Field, computed_field
 import pydantic
+import pymongo
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
@@ -399,10 +401,38 @@ async def parse_api_item_data(
 
 
 async def save_items(item_records: list[Item]) -> bool:
-    """Saves a list of Item records to the database."""
+    """Saves a list of Item records to the database. Uses `pymongo`'s `UpdateOne` method to apply bulk updates to
+    items, with the `upsert` flag to update or insert items if they aren't already present."""
+
+    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
+    prepared_item_records = []
 
     try:
-        await Item.insert_many(item_records)
+        for item in item_records:
+            assert item.price_info is not None
+            serialized_price_info = item.price_info.serialize_price_data()
+
+            prepared_item_records.append(
+                pymongo.UpdateOne(
+                    {"poe_ninja_id": item.poe_ninja_id},
+                    {
+                        "$set": {
+                            "poe_ninja_id": item.poe_ninja_id,
+                            "name": item.name,
+                            "type_": item.type_,
+                            "price_info": serialized_price_info,
+                            "variant": item.variant,
+                            "icon_url": item.icon_url,
+                            "links": item.links,
+                            "updated_time": dt.datetime.now(dt.UTC),
+                        },
+                    },
+                    upsert=True,
+                )
+            )
+
+        result = await item_collection.bulk_write(prepared_item_records)
+        logger.info(f"result from bulk saving item records: {result}")
     except Exception as exc:
         logger.error(f"error saving item records to DB: {exc}")
         return False
