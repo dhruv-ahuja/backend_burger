@@ -88,7 +88,6 @@ def convert_decimal(dict_item: dict | None):
     if dict_item is None:
         return None
 
-    # for k,v in list(dict_item.items()):
     for key, value in dict_item.items():
         if isinstance(value, dict):
             convert_decimal(value)
