@@ -60,6 +60,7 @@ class Settings(BaseSettings):
     redis_host: str
     redis_password: SecretStr | None = None
     app_environment: str
+    logfire_pydantic_plugin_record: str = "metrics"
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -85,6 +86,7 @@ def initialize_logfire_services(app: FastAPI) -> None:
     logfire.instrument_fastapi(app)
     logfire.instrument_redis()
     logfire.instrument_pymongo()
+    logfire.instrument_system_metrics()
 
 
 def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
