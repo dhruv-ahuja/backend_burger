@@ -99,29 +99,3 @@ class SortSchema(BaseModel):
 class FilterSortInput(BaseModel):
     filter_: Annotated[FilterInputType, BeforeValidator(FilterSchema.parse_filter_input)] = Field(None, alias="filter")
     sort: Annotated[SortInputType, BeforeValidator(SortSchema.parse_sort_input)]
-
-    @staticmethod
-    def parse_filter_input(query_params: list[str] | None) -> list[FilterSchema] | None:
-        if query_params is None:
-            return
-
-        filter_params = []
-        valid_params = True
-
-        for query_param in query_params:
-            try:
-                field, operation, value = query_param.split(":")
-                if operation not in FILTER_OPERATION.__args__:  # type: ignore
-                    valid_params = False
-                    break
-
-                filter_param = FilterSchema(field=field, operation=operation, value=value)  # type: ignore
-            except Exception:
-                valid_params = False
-
-            if not valid_params:
-                raise ValueError("Invalid input. Incorrect 'filter' query params.")
-
-            filter_params.append(filter_param)
-
-        return filter_params

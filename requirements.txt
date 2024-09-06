@@ -42,7 +42,7 @@ jmespath==1.0.1
 joblib==1.4.2
 kombu==5.3.4
 lazy-model==0.2.0
-logfire==0.50.1
+logfire==0.51.0
 loguru==0.7.2
 markdown-it-py==3.0.0
 MarkupSafe==2.1.5

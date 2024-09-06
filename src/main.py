@@ -1,11 +1,13 @@
 import dotenv
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 import newrelic.agent
 from pydantic import ValidationError
 from starlette import status
 
+from src.config.constants.app import CORS_ALLOWED_HOSTS
 from src.config.exceptions import (
     handle_validation_exception,
     handle_not_found_exception,
@@ -42,6 +44,13 @@ app.add_exception_handler(status.HTTP_403_FORBIDDEN, handle_auth_exception)
 
 app.add_middleware(ExceptionHandlerMiddleware)
 app.add_middleware(LoggingMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ALLOWED_HOSTS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
