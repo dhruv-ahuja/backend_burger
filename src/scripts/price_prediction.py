@@ -3,6 +3,7 @@ from asyncio import Queue
 from dataclasses import dataclass
 import datetime as dt
 from decimal import Decimal
+from json import JSONDecodeError
 import time
 from typing import Annotated, Any
 
@@ -24,6 +25,7 @@ from src.config.services import connect_to_mongodb
 from src.models import document_models
 from src.models.poe import Item
 from src.schemas.poe import Currency, ItemPrice, PriceDatedData
+
 
 # TODO: handle extreme decimal case scenarios for items like Mirror of Kalandra
 
@@ -109,6 +111,8 @@ async def prepare_api_data(
     item_id = item.poe_ninja_id
     category = item.category
 
+    api_call_succeeded = True
+
     if category in ("Currency", "Fragment"):
         url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
     else:
@@ -116,13 +120,20 @@ async def prepare_api_data(
 
     try:
         response = await client.get(url)
-        # response.raise_for_status()
+        response.raise_for_status()
         price_history_api_data: list[dict] | dict[str, list[dict]] = response.json()
     except HTTPError as exc:
         logger.error(
             f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
         )
-        price_history_api_data = []
+        api_call_succeeded = False
+    except JSONDecodeError:
+        logger.error(f"invalid price history API response for item_id {item_id} belonging to '{category}' category")
+        api_call_succeeded = False
+
+    if not api_call_succeeded:
+        price_history_map[item] = []
+        return
 
     try:
         if isinstance(price_history_api_data, dict):
