@@ -65,4 +65,9 @@ async def get_items(
         logger.error(f"error getting items from database; filter_sort: {filter_sort_input}: {exc}")
         raise
 
+    # limit price history data to past last 7 days' data
+    for item in items:
+        if item.price_info is not None and item.price_info.price_history:
+            item.price_info.price_history = item.price_info.price_history[-7:]
+
     return items, items_count

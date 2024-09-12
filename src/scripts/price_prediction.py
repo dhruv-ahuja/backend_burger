@@ -3,6 +3,7 @@ from asyncio import Queue
 from dataclasses import dataclass
 import datetime as dt
 from decimal import Decimal
+from json import JSONDecodeError
 import time
 from typing import Annotated, Any
 
@@ -23,7 +24,8 @@ from sklearn.linear_model import LinearRegression
 from src.config.services import connect_to_mongodb
 from src.models import document_models
 from src.models.poe import Item
-from src.schemas.poe import Currency, ItemPrice
+from src.schemas.poe import Currency, ItemPrice, PriceDatedData
+
 
 # TODO: handle extreme decimal case scenarios for items like Mirror of Kalandra
 
@@ -109,6 +111,8 @@ async def prepare_api_data(
     item_id = item.poe_ninja_id
     category = item.category
 
+    api_call_succeeded = True
+
     if category in ("Currency", "Fragment"):
         url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
     else:
@@ -116,13 +120,20 @@ async def prepare_api_data(
 
     try:
         response = await client.get(url)
-        # response.raise_for_status()
+        response.raise_for_status()
         price_history_api_data: list[dict] | dict[str, list[dict]] = response.json()
     except HTTPError as exc:
         logger.error(
             f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
         )
-        price_history_api_data = []
+        api_call_succeeded = False
+    except JSONDecodeError:
+        logger.error(f"invalid price history API response for item_id {item_id} belonging to '{category}' category")
+        api_call_succeeded = False
+
+    if not api_call_succeeded:
+        price_history_map[item] = []
+        return
 
     try:
         if isinstance(price_history_api_data, dict):
@@ -303,8 +314,8 @@ def prepare_item_price_data(
 
     now = dt.datetime.now(dt.UTC)
 
-    price_prediction_mapping = {}
-    price_history_mapping = {}
+    price_prediction = []
+    price_history = []
 
     if len(price_history_data) < 1:
         return
@@ -313,14 +324,15 @@ def prepare_item_price_data(
         rounded_value = round(Decimal(value), 2)
         future_date = now + dt.timedelta(index + 1)
 
-        price_prediction_mapping[future_date] = rounded_value
+        price_prediction_record = PriceDatedData(timestamp=future_date, price=rounded_value)
+        price_prediction.append(price_prediction_record)
 
-        last_week_price_data = price_history_data[-7:]
-        todays_price_data = price_history_data[-1]
+    todays_price_data = price_history_data[-1]
 
-        for entity in last_week_price_data:
-            previous_date = entity.convert_days_ago_to_date()
-            price_history_mapping[previous_date] = entity.value
+    for entity in price_history_data:
+        previous_date = entity.convert_days_ago_to_date()
+        price_history_record = PriceDatedData(timestamp=previous_date, price=entity.value)
+        price_history.append(price_history_record)
 
         # TODO: check for low confidence
         price_info = item.price_info
@@ -328,10 +340,10 @@ def prepare_item_price_data(
             price_info = item.price_info = ItemPrice()
             price_info.chaos_price = todays_price_data.value
 
-        price_info.price_history = price_history_mapping
-        price_info.price_history_currency = Currency.chaos
-        price_info.price_prediction = price_prediction_mapping
+        price_info.price_prediction = price_prediction
         price_info.price_prediction_currency = Currency.chaos
+        price_info.price_history = price_history
+        price_info.price_history_currency = Currency.chaos
 
 
 async def main():
