@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y curl libcurl4-openssl-dev build-essenti
 
 # copying and installing requirements first will avoid a re-install of all dependencies when re-building the image
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir wheel 
-RUN pip3 install --no-cache-dir -r requirements.txt 
+RUN pip3 install wheel 
+RUN pip3 install -r requirements.txt 
 
 # now starting the next layer, the one that runs the program
 # FROM ubuntu:22.04 AS runner-image 
