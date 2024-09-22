@@ -8,8 +8,8 @@ class DateMetadataDocument(Document):
     """DateMetadataDocument provides created and updated time fields, and sets the correct `updated_time` each time the
     model instance is modified."""
 
-    created_time: dt.datetime = Field(default_factory=dt.datetime.now)
-    updated_time: dt.datetime = Field(default_factory=dt.datetime.now)
+    created_time: dt.datetime = Field(default_factory=dt.datetime.utcnow)
+    updated_time: dt.datetime = Field(default_factory=dt.datetime.utcnow)
 
     @after_event(Update, Replace, SaveChanges, ValidateOnSave)
     def update_document_time(self) -> None:
