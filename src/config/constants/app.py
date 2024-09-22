@@ -22,9 +22,13 @@ INTERNAL_SCHEMA_MODELS = ["BaseResponse", "BaseError"]
 ACCESS_TOKEN_DURATION = dt.timedelta(minutes=60)
 REFRESH_TOKEN_DURATION = dt.timedelta(days=15)
 
+# * cache duration in seconds
 USER_CACHE_KEY = "users"
 SINGLE_USER_CACHE_DURATION = 60 * 60
 USERS_CACHE_DURATION = 5 * 60
+
+ITEMS_CACHE_KEY = "items"
+ITEMS_CACHE_DURATION = 6 * 60 * 60
 
 ITEMS_PER_PAGE = 100
 MAXIMUM_ITEMS_PER_PAGE = 500
