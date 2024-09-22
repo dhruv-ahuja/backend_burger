@@ -37,7 +37,10 @@ async def get_or_cache_serialized_entity(
         assert get_entity_function is not None
 
         data = await get_entity_function
-        serialized_entity = serialize_response(BaseResponse(data=data, key=response_key))
+        if isinstance(data, BaseResponse):
+            serialized_entity = serialize_response(data)
+        else:
+            serialized_entity = serialize_response(BaseResponse(data=data, key=response_key))
 
     await cache_data(redis_key, serialized_entity, expire_in, redis_client)
     logger.debug(f"cached '{redis_key}' data")
