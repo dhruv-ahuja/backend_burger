@@ -49,8 +49,9 @@ services:
       - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
       - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME}
       - NEW_RELIC_APP_NAME=backend_burger_docker
-      - ENV NEW_RELIC_LOG=/home/myuser/log/newrelic.log
+      - NEW_RELIC_LOG=/home/myuser/log/newrelic.log
       - REDIS_HOST=redis_burger
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - APP_ENVIRONMENT=prod
       - LOGFIRE_PYDANTIC_PLUGIN_RECORD=${LOGFIRE_PYDANTIC_PLUGIN_RECORD}
     env_file:
