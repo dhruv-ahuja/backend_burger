@@ -18,7 +18,7 @@ def serialize_response(response: BaseResponse[T, E] | bytes) -> bytes:
     """Convenience function that serializes responses if they are `BaseResponse`s, else returns them as-is."""
 
     if isinstance(response, BaseResponse):
-        serialized_response = orjson.dumps(response.model_dump())
+        serialized_response = orjson.dumps(response.model_dump(mode="json"))
     else:
         serialized_response = response
 
