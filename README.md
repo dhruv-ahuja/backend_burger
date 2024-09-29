@@ -16,6 +16,6 @@ An AWS ECS cluster setup running the MongoDB database service in an EC2 machine 
 Backend and DB share the same VPC and have service discovery enabled for communication using the namespace DNS. The namespace DNS ensures that the communication happens dynamically without worrying about IP addresses for the services.
 All services are private and a public Application Load Balancer routes incoming traffic to one of the upstream backend servers.
 
-## Extending the Project
+## Extending the project
 
-I'm extending this sample project to be a 'product' type of a project that has a practical use too. I'll add more information here once I have a minimal working version ready.
+I have now extended this project to serve as the backend for my [full-stack application](https://winter-orb.vercel.app/), [frontend repository](https://github.com/dhruv-ahuja/winter-orb).
