@@ -14,6 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from boto3.resources.base import ServiceResource
 from fastapi import FastAPI
+import logfire
 from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
 from mypy_boto3_logs.client import CloudWatchLogsClient
@@ -54,11 +55,12 @@ class Settings(BaseSettings):
     sqs_queue_name: str
 
     db_url: SecretStr
-
     jwt_secret_key: SecretStr
 
     redis_host: str
     redis_password: SecretStr | None = None
+    app_environment: str
+    logfire_pydantic_plugin_record: str = "metrics"
 
 
 def generate_settings_config(env_location: str | None = None) -> Settings:
@@ -71,6 +73,20 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
         settings = Settings()  # type: ignore
 
     return settings
+
+
+def initialize_logfire_services(app: FastAPI) -> None:
+    """Initializes LogFire services by configuring and initializing its client, and registering requisite services."""
+
+    # skip as requisite env vars wont be available
+    if settings.app_environment == "github_workflow":
+        return
+
+    logfire.configure()
+    logfire.instrument_fastapi(app)
+    logfire.instrument_redis()
+    logfire.instrument_pymongo()
+    logfire.instrument_system_metrics()
 
 
 def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
@@ -130,6 +146,8 @@ def initialize_logger(
         configuration["sink"] = filename
 
     logger.remove(0)
+    # adding logfire handler after registering its other services to ensure proper loguru setup
+    logger.configure(handlers=[logfire.loguru_handler()])
     logger.add(**configuration)
 
 
@@ -264,11 +282,12 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     else:
         logger.info("skipped scheduling, s3 connection was skipped")
 
-    delete_older_than = dt.datetime.utcnow() - dt.timedelta(days=1)
-    jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
-
     scheduler.start()
     async_scheduler.start()
+
+    delete_older_than = dt.datetime.now(dt.UTC) - dt.timedelta(days=1)
+    jobs.schedule_tokens_deletion(delete_older_than, async_scheduler)
+    jobs.schedule_price_prediction_run(async_scheduler)
 
     # inject services into global app state
     app_.state.queue = queue
@@ -288,4 +307,4 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
 settings = generate_settings_config()
 # initialize global client object for use across app
-db_client = AsyncIOMotorClient(settings.db_url.get_secret_value())
+db_client = AsyncIOMotorClient(settings.db_url.get_secret_value(), tz_aware=True)

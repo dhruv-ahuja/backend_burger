@@ -24,9 +24,11 @@ env:
     S3_BUCKET_NAME: ${{secrets.S3_BUCKET_NAME}}
     S3_LOGS_FOLDER: ${{secrets.S3_LOGS_FOLDER}}
     REDIS_HOST: localhost
+    APP_ENVIRONMENT: github_workflow
 
 jobs:
     build:
+        timeout-minutes: 15
         runs-on: ubuntu-latest
         
         services:
@@ -59,7 +61,7 @@ jobs:
 
             - name: Install Dependencies
               run:
-                python -m pip install --upgrade pip
+                python -m pip install --upgrade pip &&
                 pip install -r requirements.txt
             
             - name: Test code

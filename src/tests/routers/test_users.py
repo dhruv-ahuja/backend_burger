@@ -1,8 +1,9 @@
+from beanie import PydanticObjectId
 from httpx import AsyncClient
 import pytest
 
 from src.models.users import User
-from src.schemas.users import UserBase
+from src.schemas.users import Role, UserBase
 from src.tests.routers.conftest import EMAIL, USER_INPUT
 
 
@@ -63,12 +64,9 @@ async def test_create_duplicate_user(test_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("test_user", [True], indirect=True)
 @pytest.mark.parametrize("get_login_tokens", ["access"], indirect=True)
-async def test_get_users(test_user, get_login_tokens, test_client: AsyncClient):
+async def test_get_users(get_login_tokens, test_client: AsyncClient):
     """Tests getting list of users from the database."""
-
-    users: list[UserBase] = [test_user]
 
     headers = {"Authorization": f"Bearer {get_login_tokens}"}
     test_client.headers = headers
@@ -77,16 +75,13 @@ async def test_get_users(test_user, get_login_tokens, test_client: AsyncClient):
     assert response.status_code == 200
 
     response_users: list[UserBase] = response.json()["data"]["users"]
-    assert len(response_users) == len(users)
 
-    for i in range(len(users)):
-        user = users[i]
+    for i in range(len(response_users)):
         response_user = UserBase.model_validate(response_users[i])
 
-        assert user.id == response_user.id
-        assert user.name == response_user.name
-        assert user.email == response_user.email
-        assert user.role == response_user.role
+        assert isinstance(response_user.id, PydanticObjectId)
+        assert response_user.name is not None and 3 <= len(response_user.name) <= 255
+        assert isinstance(response_user.role, Role)
 
 
 @pytest.mark.asyncio

@@ -1,19 +1,26 @@
 import asyncio
 from asyncio import Queue
 from dataclasses import dataclass
+import datetime as dt
+from decimal import Decimal
 import json
 import os
 import time
 from typing import Any, cast
 
+import beanie
+import beanie.operators
 from httpx import AsyncClient, RequestError
 from loguru import logger
-from pydantic import BaseModel, Field
+import motor
+from pydantic import BaseModel, Field, computed_field
 import pydantic
+import pymongo
 
 from src.config.services import connect_to_mongodb
 from src.models import document_models
-from src.models.poe import Item, ItemCategory, ItemIdType
+from src.models.poe import Item, ItemCategory
+from src.schemas.poe import ItemIdType, ItemPrice
 
 
 @dataclass
@@ -30,6 +37,11 @@ class ApiItemData:
 
 
 # * these encapsulate required currency and item data for each entry from API responses
+class ItemSparkline(BaseModel):
+    data: list[Decimal | None]
+    totalChange: Decimal | None
+
+
 class CurrencyItemMetadata(BaseModel):
     id_: int = Field(alias="id")
     icon: str | None = None
@@ -38,14 +50,17 @@ class CurrencyItemMetadata(BaseModel):
 class CurrencyItemEntity(BaseModel):
     class Pay(BaseModel):
         pay_currency_id: int
+        listing_count: int = 0
 
     class Receive(BaseModel):
         get_currency_id: int
+        listing_count: int = 0
 
     currencyTypeName: str
     pay: Pay | None = None
     receive: Receive | None = None
     metadata: CurrencyItemMetadata | None = None
+    chaosEquivalent: Decimal = Decimal(0)
 
 
 class ItemEntity(BaseModel):
@@ -55,13 +70,28 @@ class ItemEntity(BaseModel):
     variant: str | None = None
     icon: str
     itemType: str | None = None
+    chaosValue: Decimal = Decimal(0)
+    divineValue: Decimal = Decimal(0)
+    links: int | None = None
+    listingCount: int = 0
+    sparkline: ItemSparkline
+    lowConfidenceSparkline: ItemSparkline
+
+    @computed_field
+    @property
+    def low_confidence(self) -> bool:
+        low_confidence = False
+
+        if len(self.sparkline.data) < 3 or self.listingCount < 10 and len(self.lowConfidenceSparkline.data) > 3:
+            low_confidence = True
+
+        return low_confidence
 
 
 CATEGORY_GROUP_MAP = {
     "Currency": [
         Category("Currency", "Currency"),
         Category("Fragments", "Fragment"),
-        Category("Coffins", "Coffin"),
         Category("Allflame Embers", "AllflameEmber"),
         Category("Tattoos", "Tattoo"),
         Category("Omens", "Omen"),
@@ -69,6 +99,7 @@ CATEGORY_GROUP_MAP = {
         Category("Artifacts", "Artifact"),
         Category("Oils", "Oil"),
         Category("Incubators", "Incubator"),
+        Category("Kalguuran Runes", "KalguuranRune"),
     ],
     "EquipmentAndGems": [
         Category("Unique Weapons", "UniqueWeapon"),
@@ -110,8 +141,8 @@ CATEGORY_GROUP_API_URL_MAP = {
 
 
 API_BASE_URL = "https://poe.ninja/api/data"
-
 BATCH_INSERT_LIMIT = 15_000
+LEAGUE = "Settlers"
 
 
 async def save_item_categories():
@@ -120,8 +151,10 @@ async def save_item_categories():
 
     for group, categories in CATEGORY_GROUP_MAP.items():
         for category in categories:
-            item_category = ItemCategory(name=category.name, internal_name=category.internal_name, group=group)
-            await ItemCategory.save(item_category)
+            await ItemCategory.find_one(ItemCategory.name == category.name).upsert(
+                beanie.operators.Set({ItemCategory.updated_time: dt.datetime.now(dt.UTC)}),
+                on_insert=ItemCategory(name=category.name, internal_name=category.internal_name, group=group),
+            )  # type: ignore
 
 
 def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]):
@@ -184,8 +217,8 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
 
-    api_endpoint = "currencyoverview" if internal_category_name == "Currency" else "itemoverview"
-    url = f"/{api_endpoint}?league=Necropolis&type={internal_category_name}"
+    api_endpoint = "currencyoverview" if internal_category_name in ["Currency", "Fragment"] else "itemoverview"
+    url = f"/{api_endpoint}?league={LEAGUE}&type={internal_category_name}"
 
     item_data = []
     currency_item_metadata = []
@@ -198,6 +231,9 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     else:
         json_response = response.json()
         item_data: list[dict] = json_response["lines"]
+        if len(item_data) < 2:
+            logger.error(f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'")
+
         currency_item_metadata: list[dict] = json_response.get("currencyDetails", [])
 
     api_item_data = ApiItemData(item_data, currency_item_metadata)
@@ -268,12 +304,16 @@ def prepare_item_record(
         if item_entity.pay is not None:
             poe_ninja_id = item_entity.pay.pay_currency_id
             id_type = ItemIdType.pay
+            listings = item_entity.pay.listing_count
         elif item_entity.receive is not None:
             poe_ninja_id = item_entity.receive.get_currency_id
             id_type = ItemIdType.receive
+            listings = item_entity.receive.listing_count
         else:
             logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
             return
+
+        price_info = ItemPrice(chaos_price=item_entity.chaosEquivalent, listings=listings)
 
         item_metadata = item_entity.metadata
         item_record = Item(
@@ -281,19 +321,30 @@ def prepare_item_record(
             id_type=id_type,
             name=item_entity.currencyTypeName,
             type_=None,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_metadata.icon if item_metadata else None,
+            price_info=price_info,
         )
 
     else:
         item_entity = cast(ItemEntity, item_entity)
+
+        price_info = ItemPrice(
+            chaos_price=item_entity.chaosValue,
+            divine_price=item_entity.divineValue,
+            listings=item_entity.listingCount,
+            low_confidence=item_entity.low_confidence,
+        )
+        # TODO: save baseType too
         item_record = Item(
             poe_ninja_id=item_entity.id_,
             name=item_entity.name,
             type_=item_entity.itemType,
-            category=category_record,  # type: ignore
+            category=category_record.internal_name,
             icon_url=item_entity.icon,
             variant=item_entity.variant,
+            links=item_entity.links,
+            price_info=price_info,
         )
 
     return item_record
@@ -322,7 +373,7 @@ async def parse_api_item_data(
         category_name = category_record.name
         category_internal_name = category_record.internal_name
 
-        is_currency = category_internal_name == "Currency"
+        is_currency = category_internal_name in ["Currency", "Fragment"]
         currency_item_metadata = api_item_data.currency_item_metadata
 
         logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
@@ -350,10 +401,38 @@ async def parse_api_item_data(
 
 
 async def save_items(item_records: list[Item]) -> bool:
-    """Saves a list of Item records to the database."""
+    """Saves a list of Item records to the database. Uses `pymongo`'s `UpdateOne` method to apply bulk updates to
+    items, with the `upsert` flag to update or insert items if they aren't already present."""
+
+    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
+    prepared_item_records = []
 
     try:
-        await Item.insert_many(item_records)
+        for item in item_records:
+            assert item.price_info is not None
+            serialized_price_info = item.price_info.serialize_price_data()
+
+            prepared_item_records.append(
+                pymongo.UpdateOne(
+                    {"poe_ninja_id": item.poe_ninja_id},
+                    {
+                        "$set": {
+                            "poe_ninja_id": item.poe_ninja_id,
+                            "name": item.name,
+                            "type_": item.type_,
+                            "price_info": serialized_price_info,
+                            "variant": item.variant,
+                            "icon_url": item.icon_url,
+                            "links": item.links,
+                            "updated_time": dt.datetime.now(dt.UTC),
+                        },
+                    },
+                    upsert=True,
+                )
+            )
+
+        result = await item_collection.bulk_write(prepared_item_records)
+        logger.info(f"result from bulk saving item records: {result}")
     except Exception as exc:
         logger.error(f"error saving item records to DB: {exc}")
         return False

@@ -1,6 +1,6 @@
-from typing import Any, cast
+from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from loguru import logger
 from motor.core import AgnosticClientSession
@@ -9,7 +9,6 @@ from starlette import status
 
 from src import dependencies as deps
 from src.config.constants import app
-from src.models.users import User
 from src.schemas.responses import BaseResponse
 from src.schemas.users import UserBase
 from src.schemas.web_responses import auth as resp
@@ -35,8 +34,6 @@ async def login(
     refresh_token, refresh_token_expiration_time = auth_utils.create_bearer_token(
         app.REFRESH_TOKEN_DURATION, str(user.id)
     )
-
-    print(refresh_token_expiration_time)
 
     redis_client: Redis = request.app.state.redis
     redis_key = f"{app.USER_CACHE_KEY}:{user.id}"
@@ -66,7 +63,9 @@ async def logout(
     """Logs the current user out of the application."""
 
     user = await users_service.get_user_from_database(user_base.id)
-    user = cast(User, user)
+
+    if user is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found.")
 
     async with db_session.start_transaction():
         await service.invalidate_refresh_token(user, db_session)

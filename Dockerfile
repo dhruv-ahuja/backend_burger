@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y curl libcurl4-openssl-dev build-essenti
 
 # copying and installing requirements first will avoid a re-install of all dependencies when re-building the image
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir wheel 
-RUN pip3 install --no-cache-dir -r requirements.txt 
+RUN pip3 install wheel 
+RUN pip3 install -r requirements.txt 
 
 # now starting the next layer, the one that runs the program
 # FROM ubuntu:22.04 AS runner-image 
@@ -46,4 +46,4 @@ RUN mkdir -p /home/myuser/log
 EXPOSE 8000
 
 # using /dev/shm as the worker temp dir will help prevent random locks and freezes used for gunicorn heartbeat
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]
+CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]

@@ -1,9 +1,13 @@
 import datetime as dt
+from decimal import Decimal
+import subprocess
+
 
 from apscheduler.job import Job
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from bson import Decimal128
 from loguru import logger
 from mypy_boto3_s3.service_resource import Bucket
 
@@ -40,3 +44,57 @@ def schedule_tokens_deletion(delete_older_than: dt.datetime, scheduler: AsyncIOS
     logger.info(f"scheduled '{job_id}' job to run daily")
 
     return job
+
+
+def _run_price_prediction_script():
+    """Runs the price prediction script, capturing any output and errors that happen during the process call."""
+
+    script_path = "src/scripts/price_prediction.py"
+    try:
+        logger.info("running price prediction script")
+        # Run the script and wait for it to complete
+        result = subprocess.run(["python", script_path], capture_output=True, text=True, check=True)
+
+        # Print the output from the script
+        logger.info(f"Output from price prediction script: {result.stdout}")
+
+        if result.stderr:
+            logger.error(f"Errors or log ouputs from script: {result.stderr}")
+
+    except subprocess.CalledProcessError as exc:
+        logger.error(f"Error while running price prediction script: {exc}")
+    else:
+        logger.info("price prediction script ran successfully")
+
+
+def schedule_price_prediction_run(scheduler: AsyncIOScheduler) -> Job:
+    """Schedules the price prediction function to run daily."""
+
+    job_id = "price_prediction_run"
+    trigger = CronTrigger(hour=5, timezone=dt.UTC)
+
+    job = config.setup_job(scheduler, _run_price_prediction_script, job_id, trigger)
+    logger.info(f"scheduled '{job_id}' job to run daily")
+
+    return job
+
+
+def convert_decimal(dict_item: dict | None):
+    """This function iterates a dictionary looking for types of Decimal and converts them to Decimal128
+    Embedded dictionaries and lists are called recursively.
+
+    See: https://stackoverflow.com/questions/61456784/pymongo-cannot-encode-object-of-type-decimal-decimal"""
+
+    if dict_item is None:
+        return None
+
+    for key, value in dict_item.items():
+        if isinstance(value, dict):
+            convert_decimal(value)
+        elif isinstance(value, list):
+            for entry in value:
+                convert_decimal(entry)
+        elif isinstance(value, Decimal):
+            dict_item[key] = Decimal128(str(value))
+
+    return dict_item

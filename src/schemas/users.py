@@ -3,7 +3,7 @@ from enum import Enum
 import re
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, EmailStr, Field, SecretStr, validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, validator
 
 from src.config.constants.app import PASSWORD_REGEX
 
@@ -43,10 +43,13 @@ class UserBase(BaseModel):
     """UserBase is the base user model, encapsulating core-User instance data. Omits the password field for
     security."""
 
-    id: PydanticObjectId | None = None
+    id: PydanticObjectId | None = Field(default=None, validation_alias="_id")
     name: str = Field(min_length=3, max_length=255)
     email: EmailStr
     role: Role
+
+    # this allows populating the `id` field by the `_id` alias matching the Mongo _id attribute
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class UserBaseResponse(UserBase):

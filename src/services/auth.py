@@ -20,7 +20,7 @@ async def check_users_credentials(form_data: OAuth2PasswordRequestForm) -> UserB
     invalid_credentials_error = HTTPException(status.HTTP_401_UNAUTHORIZED, headers={"WWW-Authenticate": "Bearer"})
 
     user_email = form_data.username
-    user = await users_service.get_user_from_database(None, user_email, missing_user_error=False)
+    user = await users_service.get_user_from_database(None, user_email)
     if user is None:
         raise invalid_credentials_error
 
@@ -50,7 +50,7 @@ async def save_session_details(
     """Saves users session details, storing the issued refresh token and its expiration time in the database.
     Re-uses an existing session record or creates a new one."""
 
-    now = dt.datetime.utcnow()
+    now = dt.datetime.now(dt.UTC)
 
     try:
         user_record = await users_service.get_user_from_database(user.id)
@@ -104,7 +104,7 @@ async def invalidate_refresh_token(user: User, db_session: AgnosticClientSession
         if user.session is not None:
             user.session.refresh_token = None
             user.session.expiration_time = None
-            user.session.updated_time = dt.datetime.utcnow()
+            user.session.updated_time = dt.datetime.now(dt.UTC)
         await user.replace(session=db_session)  # type: ignore
     except Exception as exc:
         logger.error(f"error invalidating refresh token: {exc}")
