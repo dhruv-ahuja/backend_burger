@@ -82,7 +82,11 @@ class ItemEntity(BaseModel):
     def low_confidence(self) -> bool:
         low_confidence = False
 
-        if len(self.sparkline.data) < 3 or self.listingCount < 10 and len(self.lowConfidenceSparkline.data) > 3:
+        if (
+            len(self.sparkline.data) < 3
+            or self.listingCount < 10
+            and len(self.lowConfidenceSparkline.data) > 3
+        ):
             low_confidence = True
 
         return low_confidence
@@ -152,8 +156,14 @@ async def save_item_categories():
     for group, categories in CATEGORY_GROUP_MAP.items():
         for category in categories:
             await ItemCategory.find_one(ItemCategory.name == category.name).upsert(
-                beanie.operators.Set({ItemCategory.updated_time: dt.datetime.now(dt.UTC)}),
-                on_insert=ItemCategory(name=category.name, internal_name=category.internal_name, group=group),
+                beanie.operators.Set(
+                    {ItemCategory.updated_time: dt.datetime.now(dt.UTC)}
+                ),
+                on_insert=ItemCategory(
+                    name=category.name,
+                    internal_name=category.internal_name,
+                    group=group,
+                ),
             )  # type: ignore
 
 
@@ -173,7 +183,9 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]):
+async def prepare_api_data(
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]
+):
     start = time.perf_counter()
     async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
@@ -183,7 +195,9 @@ async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiIte
 
                 category_record = await get_category_by_name(category_name)
                 if category_record is None:
-                    logger.error(f"DB record for {category.name} wasn't found, skipping process!")
+                    logger.error(
+                        f"DB record for {category.name} wasn't found, skipping process!"
+                    )
                     continue
 
                 logger.debug(f"getting api data for {category_name}")
@@ -205,7 +219,9 @@ async def get_category_by_name(name: str) -> ItemCategory | None:
     """Gets an `ItemCategory` document from the database by its name."""
 
     try:
-        category_record = await ItemCategory.find(ItemCategory.name == name).first_or_none()
+        category_record = await ItemCategory.find(
+            ItemCategory.name == name
+        ).first_or_none()
     except Exception as exc:
         logger.error(f"error getting category by name '{name}': {exc} ")
         return
@@ -213,11 +229,17 @@ async def get_category_by_name(name: str) -> ItemCategory | None:
     return category_record
 
 
-async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData:
+async def get_item_api_data(
+    internal_category_name: str, client: AsyncClient
+) -> ApiItemData:
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
 
-    api_endpoint = "currencyoverview" if internal_category_name in ["Currency", "Fragment"] else "itemoverview"
+    api_endpoint = (
+        "currencyoverview"
+        if internal_category_name in ["Currency", "Fragment"]
+        else "itemoverview"
+    )
     url = f"/{api_endpoint}?league={LEAGUE}&type={internal_category_name}"
 
     item_data = []
@@ -225,14 +247,20 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
 
     try:
         response = await client.get(url)
-        logger.debug(f"category: {internal_category_name}, status_code: {response.status_code}")
+        logger.debug(
+            f"category: {internal_category_name}, status_code: {response.status_code}"
+        )
     except RequestError as exc:
-        logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
+        logger.error(
+            f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}"
+        )
     else:
         json_response = response.json()
         item_data: list[dict] = json_response["lines"]
         if len(item_data) < 2:
-            logger.error(f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'")
+            logger.error(
+                f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'"
+            )
 
         currency_item_metadata: list[dict] = json_response.get("currencyDetails", [])
 
@@ -240,7 +268,9 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     return api_item_data
 
 
-def map_currency_icon_urls(currency_item_metadata: list[dict[str, Any]]) -> dict[int, CurrencyItemMetadata]:
+def map_currency_icon_urls(
+    currency_item_metadata: list[dict[str, Any]]
+) -> dict[int, CurrencyItemMetadata]:
     """Maps a list of currency item metadata to each records' ID."""
 
     currency_item_mapping = {}
@@ -250,14 +280,18 @@ def map_currency_icon_urls(currency_item_metadata: list[dict[str, Any]]) -> dict
             entry = CurrencyItemMetadata(**data)
             currency_item_mapping[entry.id_] = entry
         except pydantic.ValidationError as exc:
-            logger.error(f"error parsing currency icon data ({data}) into schema: {exc}")
+            logger.error(
+                f"error parsing currency icon data ({data}) into schema: {exc}"
+            )
             continue
 
     return currency_item_mapping
 
 
 def parse_api_entity(
-    api_item_entity: dict[str, Any], is_currency: bool, currency_item_metadata: list[dict[str, Any]]
+    api_item_entity: dict[str, Any],
+    is_currency: bool,
+    currency_item_metadata: list[dict[str, Any]],
 ) -> CurrencyItemEntity | ItemEntity | None:
     """Parse API Entity data into respective Currency or ItemEntity instances, adding currency item metadata
     for items under the currency group, if metadata is available."""
@@ -292,7 +326,9 @@ def parse_api_entity(
 
 
 def prepare_item_record(
-    item_entity: CurrencyItemEntity | ItemEntity, category_record: ItemCategory, is_currency: bool
+    item_entity: CurrencyItemEntity | ItemEntity,
+    category_record: ItemCategory,
+    is_currency: bool,
 ) -> Item | None:
     """Prepares item record by assigning parsed data to the DB model instance. Skips instantiating currency records if
     neither pay or get IDs are available to act as an identifier."""
@@ -310,10 +346,14 @@ def prepare_item_record(
             id_type = ItemIdType.receive
             listings = item_entity.receive.listing_count
         else:
-            logger.error(f"no pay or get id found for {item_entity.currencyTypeName}, skipping")
+            logger.error(
+                f"no pay or get id found for {item_entity.currencyTypeName}, skipping"
+            )
             return
 
-        price_info = ItemPrice(chaos_price=item_entity.chaosEquivalent, listings=listings)
+        price_info = ItemPrice(
+            chaos_price=item_entity.chaosEquivalent, listings=listings
+        )
 
         item_metadata = item_entity.metadata
         item_record = Item(
@@ -351,7 +391,8 @@ def prepare_item_record(
 
 
 async def parse_api_item_data(
-    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None], item_data_queue: Queue[list[Item] | None]
+    api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None],
+    item_data_queue: Queue[list[Item] | None],
 ) -> None:
     """Fetches item API data from the respective queue, and parses it into apt Pydantic model instances, hence
     structuring each item in the list and validating its values.
@@ -376,10 +417,14 @@ async def parse_api_item_data(
         is_currency = category_internal_name in ["Currency", "Fragment"]
         currency_item_metadata = api_item_data.currency_item_metadata
 
-        logger.debug(f"received item data for {category_name}, parsing into pydantic instances")
+        logger.debug(
+            f"received item data for {category_name}, parsing into pydantic instances"
+        )
 
         for api_item_entity in api_item_data.item_data:
-            item_entity = parse_api_entity(api_item_entity, is_currency, currency_item_metadata)
+            item_entity = parse_api_entity(
+                api_item_entity, is_currency, currency_item_metadata
+            )
             if item_entity is None:
                 continue
 
@@ -404,7 +449,9 @@ async def save_items(item_records: list[Item]) -> bool:
     """Saves a list of Item records to the database. Uses `pymongo`'s `UpdateOne` method to apply bulk updates to
     items, with the `upsert` flag to update or insert items if they aren't already present."""
 
-    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
+    item_collection: motor.motor_asyncio.AsyncIOMotorCollection = (
+        Item.get_motor_collection()
+    )  # type: ignore
     prepared_item_records = []
 
     try:
@@ -420,6 +467,7 @@ async def save_items(item_records: list[Item]) -> bool:
                             "poe_ninja_id": item.poe_ninja_id,
                             "name": item.name,
                             "type_": item.type_,
+                            "category": item.category,
                             "price_info": serialized_price_info,
                             "variant": item.variant,
                             "icon_url": item.icon_url,
@@ -431,8 +479,7 @@ async def save_items(item_records: list[Item]) -> bool:
                 )
             )
 
-        result = await item_collection.bulk_write(prepared_item_records)
-        logger.info(f"result from bulk saving item records: {result}")
+        await item_collection.bulk_write(prepared_item_records)
     except Exception as exc:
         logger.error(f"error saving item records to DB: {exc}")
         return False
