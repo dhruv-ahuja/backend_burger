@@ -1,5 +1,7 @@
 # [wip]backend_burger
 
+Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path of Exile item application.
+
 ## Tech Stack
 
 - FastAPI webapp running on Python3.11
@@ -8,6 +10,15 @@
 - Ruff for formatting and linting code
 - AWS Services: Cloudwatch to gather logs, S3 Bucket to store logs for long durations, SQS to handle background tasks
 - New Relic integration for application monitoring
+
+## Services
+
+- MongoDB: application database configured through `DB_URL`
+- Redis: response and user-session caching
+- AWS SQS: background tasks
+- AWS S3 and CloudWatch: long-term and application logs
+
+MongoDB and the AWS services are external dependencies. Docker Compose starts Redis and the backend service; the MongoDB service is currently disabled in `docker-compose.yml`.
 
 ## Initial setup
 
@@ -47,6 +58,25 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
+
+## API
+
+- `/auth`: login, logout, and token refresh
+- `/users`: user creation and user management
+- `/poe`: Path of Exile item categories and item data
+- `/`: basic health response
+
+FastAPI's OpenAPI endpoints are available locally at `http://localhost:8000/docs`. They are disabled when `APP_ENVIRONMENT=prod`.
+
+## Development checks
+
+Run the same checks used by CI:
+
+```bash
+pytest . -s -v -W ignore
+ruff format --line-length=120 --check .
+ruff check .
+```
 
 ## Build and run with Docker
 
