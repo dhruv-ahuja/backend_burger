@@ -58,7 +58,6 @@ mypy-boto3-rds==1.28.84
 mypy-boto3-s3==1.28.55
 mypy-boto3-sqs==1.28.82
 mypy-extensions==1.0.0
-newrelic==9.3.0
 numpy==2.0.0
 opentelemetry-api==1.27.0
 opentelemetry-exporter-otlp-proto-common==1.27.0
