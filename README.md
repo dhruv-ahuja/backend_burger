@@ -45,10 +45,13 @@ For a local setup, set `APP_ENVIRONMENT=dev`. By default, the Docker Compose ser
 Install the locked development environment with:
 
 ```bash
+uv venv .venv --allow-existing
 uv sync
 ```
 
 `uv.lock` is committed to keep local, CI, and Docker dependencies reproducible. Run `uv lock` after changing dependencies and use `uv sync --locked` in CI or deployment environments.
+
+uv creates the environment in `.venv` at the project root. The commands below use `uv run`, so activating the environment manually is not required.
 
 ## Running the app
 
