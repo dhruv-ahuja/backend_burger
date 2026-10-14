@@ -1,43 +1,35 @@
-# using a python docker base image
-# using a multi-stage build to save space
 FROM python:3.11-slim AS builder-image
 
-# create a venv to make copying packages folder easier b/w the different stages declaring the path to avoid path issues
-# w/ packages
-RUN python3.11 -m venv /home/myuser/venv 
-ENV PATH="/home/myuser/venv/bin:$PATH"
+# use uv to install the locked application environment
+COPY --from=ghcr.io/astral-sh/uv:0.13.1 /uv /uvx /bin/
 
 # install extra libraries needed for pycurl
 RUN apt-get update && apt-get install -y curl libcurl4-openssl-dev build-essential libssl-dev
 
-# copying and installing requirements first will avoid a re-install of all dependencies when re-building the image
-COPY requirements.txt .
-RUN pip3 install wheel 
-RUN pip3 install -r requirements.txt 
+# copying dependency metadata first will avoid reinstalling dependencies when rebuilding the image
+WORKDIR /home/myuser/webapp
+COPY pyproject.toml uv.lock ./
+RUN uv sync --locked --no-dev
 
-# now starting the next layer, the one that runs the program
-# FROM ubuntu:22.04 AS runner-image 
 FROM python:3.11-slim AS runner-image
 
 # creating a separate user to run the docker commands, helps with security as root access is denied to this user
 RUN useradd --create-home myuser
 
-# copy over the virtualenv created in the previous layer to the current user's dir
-COPY --from=builder-image /home/myuser/venv /home/myuser/venv
+# copy over the virtualenv created in the previous layer
+COPY --from=builder-image /home/myuser/webapp/.venv /home/myuser/venv
 
 # re-install curl for AWS ECS healthcheck
 RUN apt-get update && apt-get install -y curl
 
-# create and set workdir, copy over all data to the folder 
 USER myuser
 RUN mkdir /home/myuser/webapp 
 WORKDIR /home/myuser/webapp
-COPY . . 
+COPY --chown=myuser:myuser . .
 
 # improves logging behaviour for containers
 ENV PYTHONUNBUFFERED=1
 
-# activate the virtualenv
 ENV VIRTUAL_ENV=/home/myuser/venv
 ENV PATH="/home/myuser/venv/bin:$PATH"
 
