@@ -1,19 +1,6 @@
 version: "3"
 
 services:
-  # mongodb_burger: 
-  #   image: mongodb/mongodb-community-server:7.0.2-ubuntu2204
-  #   container_name: mongodb_burger
-  #   environment:
-  #     - MONGO_INITDB_ROOT_USERNAME=${DB_USER}
-  #     - MONGO_INITDB_ROOT_PASSWORD=${DB_PASSWORD}
-  #   ports:
-  #     - "27017:27017"
-  #   volumes:
-  #     - ~/docker_data/mongo:/data/db
-  #   networks:
-  #     - backend_burger_network
-
   redis_burger: 
     image: redis:7.2.4
     container_name: redis_burger
@@ -46,14 +33,9 @@ services:
       - S3_LOGS_FOLDER=${S3_LOGS_FOLDER}
       - DB_URL=${DB_URL}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - NEW_RELIC_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
-      - NEW_RELIC_APP_NAME=${NEW_RELIC_APP_NAME}
-      - NEW_RELIC_APP_NAME=backend_burger_docker
-      - NEW_RELIC_LOG=/home/myuser/log/newrelic.log
       - REDIS_HOST=redis_burger
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - APP_ENVIRONMENT=prod
-      - LOGFIRE_PYDANTIC_PLUGIN_RECORD=${LOGFIRE_PYDANTIC_PLUGIN_RECORD}
     env_file:
       - .env
     ports:
@@ -62,7 +44,6 @@ services:
       - backend_burger_network
     depends_on:
       - redis_burger
-      # - mongodb_burger
   
 networks:
   backend_burger_network:

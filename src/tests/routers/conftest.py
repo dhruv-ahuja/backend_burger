@@ -85,8 +85,13 @@ async def get_login_tokens(request: pytest.FixtureRequest, test_user: UserBase, 
                 yield data["refresh_token"]
             else:
                 yield data
-            break
+            return
 
         else:
             tries -= 1
-            await asyncio.sleep(0.1)
+            if tries > 0:
+                # JWT timestamps have one-second precision, so wait for the next
+                # timestamp before retrying a token blacklisted by an earlier test.
+                await asyncio.sleep(1.1)
+
+    pytest.fail("could not generate an access token that was not already blacklisted")

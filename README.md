@@ -9,7 +9,6 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - Pydantic v2 for all schemas, models and validation needs
 - Ruff for formatting and linting code
 - AWS Services: Cloudwatch to gather logs, S3 Bucket to store logs for long durations, SQS to handle background tasks
-- New Relic integration for application monitoring
 
 ## Services
 
@@ -18,11 +17,11 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - AWS SQS: background tasks
 - AWS S3 and CloudWatch: long-term and application logs
 
-MongoDB and the AWS services are external dependencies. Docker Compose starts Redis and the backend service; the MongoDB service is currently disabled in `docker-compose.yml`.
+MongoDB and the AWS services are external dependencies by default. Docker Compose starts Redis and the backend service; use the local Compose override below to run MongoDB locally.
 
 ## Initial setup
 
-Create a `.env` file in the project root before running the application. The environment file is used by Docker Compose and should not be committed.
+Install [uv](https://docs.astral.sh/uv/) and create a `.env` file in the project root before running the application. The environment file is used by Docker Compose and should not be committed.
 
 ```env
 AWS_ACCESS_KEY_ID=<your-aws-access-key-id>
@@ -36,9 +35,6 @@ DB_USER=dhruv
 DB_PASSWORD=<your-database-password>
 DB_URL=<your-database-url>
 JWT_SECRET_KEY=<your-jwt-secret-key>
-LOGFIRE_PYDANTIC_PLUGIN_RECORD=<true-or-false>
-NEW_RELIC_LICENSE_KEY=<your-new-relic-license-key>
-NEW_RELIC_APP_NAME=<your-new-relic-app-name>
 REDIS_HOST=<your-redis-host>
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
@@ -46,18 +42,63 @@ APP_ENVIRONMENT=dev
 
 For a local setup, set `APP_ENVIRONMENT=dev`. By default, the Docker Compose service sets `APP_ENVIRONMENT=prod` for containerized runs.
 
+Install the locked development environment with:
+
+```bash
+uv venv .venv --allow-existing
+uv sync
+```
+
+`uv.lock` is committed to keep local, CI, and Docker dependencies reproducible. Run `uv lock` after changing dependencies and use `uv sync --locked` in CI or deployment environments.
+
+uv creates the environment in `.venv` at the project root. The commands below use `uv run`, so activating the environment manually is not required.
+
 ## Running the app
 
 Install the dependencies and run the FastAPI application locally:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
+
+## Local MongoDB
+
+Start MongoDB 7.0.2 for host-based development:
+
+```bash
+docker compose up -d mongodb_burger
+docker exec mongodb_burger mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
+```
+
+The local setup uses MongoDB 7.0.2 to avoid MongoDB and Orbstack kernel compatibility issues with MongoDB 8.
+`docker-compose.override.yml` is loaded automatically and extends `docker-compose.yml` for local development.
+
+Run the application against the local services:
+
+```bash
+DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
+REDIS_HOST=localhost \
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Run the test suite against the local MongoDB instance:
+
+```bash
+DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
+REDIS_HOST=localhost \
+uv run pytest . -s -v -W ignore
+```
+
+> **NOTE:** GitHub Actions starts the same MongoDB version as a disposable single-node replica set and overrides `DB_URL` with a
+> localhost connection string.
+
+Stop the local dependencies:
+
+```bash
+docker compose down
+```
 
 ## API
 
@@ -73,9 +114,9 @@ FastAPI's OpenAPI endpoints are available locally at `http://localhost:8000/docs
 Run the same checks used by CI:
 
 ```bash
-pytest . -s -v -W ignore
-ruff format --line-length=120 --check .
-ruff check .
+uv run pytest . -s -v -W ignore
+uv run ruff format --line-length=120 --check .
+uv run ruff check .
 ```
 
 ## Build and run with Docker

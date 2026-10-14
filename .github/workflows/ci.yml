@@ -14,7 +14,8 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    DB_URL: ${{secrets.DB_URL}}
+    # Tests use a disposable local replica set instead of depending on MongoDB Atlas.
+    DB_URL: mongodb://localhost:27017/backendBurger?replicaSet=rs0&directConnection=true
     JWT_SECRET_KEY: ${{secrets.JWT_SECRET_KEY}}
     AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
     AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
@@ -50,10 +51,16 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Setup Python
-              uses: actions/setup-python@v4
+              uses: actions/setup-python@v5
               with:
                 python-version: "3.11"
-                cache: "pip"
+
+            - name: Setup uv
+              uses: astral-sh/setup-uv@v6
+              with:
+                version: "0.13.1"
+                enable-cache: true
+                cache-dependency-glob: "uv.lock"
             
             - name: Install PyCurl Dependencies
               run: 
@@ -61,22 +68,51 @@ jobs:
 
             - name: Install Dependencies
               run:
-                python -m pip install --upgrade pip &&
-                pip install -r requirements.txt
+                uv sync --locked
+
+            - name: Start MongoDB replica set
+              run: |
+                # A replica set is required by the application's transaction-backed routes.
+                docker run --detach \
+                  --name mongodb_burger \
+                  --publish 27017:27017 \
+                  mongodb/mongodb-community-server:7.0.2-ubuntu2204 \
+                  --replSet rs0 --bind_ip_all
+
+                for attempt in {1..30}; do
+                  if docker exec mongodb_burger mongosh --quiet \
+                    --eval 'quit(db.adminCommand({ping: 1}).ok ? 0 : 1)'; then
+                    break
+                  fi
+                  sleep 1
+                done
+
+                docker exec mongodb_burger mongosh --quiet --eval \
+                  'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
+
+                for attempt in {1..30}; do
+                  if docker exec mongodb_burger mongosh --quiet \
+                    --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then
+                    exit 0
+                  fi
+                  sleep 1
+                done
+
+                docker logs mongodb_burger
+                exit 1
             
             - name: Test code
               run: 
-                pytest . -s -v -W ignore
+                uv run pytest . -s -v -W ignore
             
             - name: Check Code Formatting
               run:
-                ruff format --line-length=120 --check . 
+                uv run ruff format --line-length=120 --check .
             
             - name: Check Code Linting
               run: 
-                ruff check .
+                uv run ruff check .
             
             - name: Setup Tmate Session
               if: ${{ failure() }}
               uses: mxschmitt/action-tmate@v3
-              
