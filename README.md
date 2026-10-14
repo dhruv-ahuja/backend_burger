@@ -21,7 +21,7 @@ MongoDB and the AWS services are external dependencies. Docker Compose starts Re
 
 ## Initial setup
 
-Create a `.env` file in the project root before running the application. The environment file is used by Docker Compose and should not be committed.
+Install [uv](https://docs.astral.sh/uv/) and create a `.env` file in the project root before running the application. The environment file is used by Docker Compose and should not be committed.
 
 ```env
 AWS_ACCESS_KEY_ID=<your-aws-access-key-id>
@@ -42,15 +42,20 @@ APP_ENVIRONMENT=dev
 
 For a local setup, set `APP_ENVIRONMENT=dev`. By default, the Docker Compose service sets `APP_ENVIRONMENT=prod` for containerized runs.
 
+Install the locked development environment with:
+
+```bash
+uv sync
+```
+
+`uv.lock` is committed to keep local, CI, and Docker dependencies reproducible. Run `uv lock` after changing dependencies and use `uv sync --locked` in CI or deployment environments.
+
 ## Running the app
 
 Install the dependencies and run the FastAPI application locally:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
@@ -69,9 +74,9 @@ FastAPI's OpenAPI endpoints are available locally at `http://localhost:8000/docs
 Run the same checks used by CI:
 
 ```bash
-pytest . -s -v -W ignore
-ruff format --line-length=120 --check .
-ruff check .
+uv run pytest . -s -v -W ignore
+uv run ruff format --line-length=120 --check .
+uv run ruff check .
 ```
 
 ## Build and run with Docker
