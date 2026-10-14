@@ -15,7 +15,7 @@ from src.config.exceptions import (
     handle_auth_exception,
 )
 from src.config.middleware import ExceptionHandlerMiddleware, LoggingMiddleware
-from src.config.services import setup_services, initialize_logfire_services, settings
+from src.config.services import setup_services, settings
 from src.routers import poe, users, auth
 from src.schemas.responses import BaseResponse
 
@@ -31,7 +31,6 @@ app = FastAPI(
     version="0.1.0",
     openapi_url=None if settings.app_environment == "prod" else "/openapi.json",
 )
-initialize_logfire_services(app)
 
 app.include_router(users.router)
 app.include_router(auth.router)
