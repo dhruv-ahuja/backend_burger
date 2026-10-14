@@ -49,7 +49,6 @@ services:
       - REDIS_HOST=redis_burger
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - APP_ENVIRONMENT=prod
-      - LOGFIRE_PYDANTIC_PLUGIN_RECORD=${LOGFIRE_PYDANTIC_PLUGIN_RECORD}
     env_file:
       - .env
     ports:

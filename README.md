@@ -35,7 +35,6 @@ DB_USER=dhruv
 DB_PASSWORD=<your-database-password>
 DB_URL=<your-database-url>
 JWT_SECRET_KEY=<your-jwt-secret-key>
-LOGFIRE_PYDANTIC_PLUGIN_RECORD=<true-or-false>
 REDIS_HOST=<your-redis-host>
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
