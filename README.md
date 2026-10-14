@@ -68,11 +68,12 @@ The application is available at `http://localhost:8000`.
 Start MongoDB 7.0.2 for host-based development:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml up -d mongodb_burger
+docker compose up -d mongodb_burger
 docker exec mongodb_burger mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
 ```
 
 The local setup uses MongoDB 7.0.2 to avoid MongoDB and Orbstack kernel compatibility issues with MongoDB 8.
+`docker-compose.override.yml` is loaded automatically and extends `docker-compose.yml` for local development.
 
 Run the application against the local services:
 
@@ -93,7 +94,7 @@ uv run pytest . -s -v -W ignore
 Stop the local dependencies:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.local.yml down
+docker compose down
 ```
 
 ## API
