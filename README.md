@@ -91,6 +91,10 @@ REDIS_HOST=localhost \
 uv run pytest . -s -v -W ignore
 ```
 
+GitHub Actions starts the same MongoDB version as a disposable single-node replica set and overrides `DB_URL` with a
+localhost connection string. CI tests therefore do not depend on MongoDB Atlas or the `DB_URL` Actions secret; the
+secret can remain configured for deployment workflows.
+
 Stop the local dependencies:
 
 ```bash
