@@ -3,7 +3,6 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
-import newrelic.agent
 from pydantic import ValidationError
 from starlette import status
 
@@ -22,7 +21,6 @@ from src.schemas.responses import BaseResponse
 
 
 dotenv.load_dotenv()
-newrelic.agent.initialize("./newrelic.ini")
 
 
 app = FastAPI(

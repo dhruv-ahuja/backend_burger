@@ -9,7 +9,6 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - Pydantic v2 for all schemas, models and validation needs
 - Ruff for formatting and linting code
 - AWS Services: Cloudwatch to gather logs, S3 Bucket to store logs for long durations, SQS to handle background tasks
-- New Relic integration for application monitoring
 
 ## Services
 
@@ -37,8 +36,6 @@ DB_PASSWORD=<your-database-password>
 DB_URL=<your-database-url>
 JWT_SECRET_KEY=<your-jwt-secret-key>
 LOGFIRE_PYDANTIC_PLUGIN_RECORD=<true-or-false>
-NEW_RELIC_LICENSE_KEY=<your-new-relic-license-key>
-NEW_RELIC_APP_NAME=<your-new-relic-app-name>
 REDIS_HOST=<your-redis-host>
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
