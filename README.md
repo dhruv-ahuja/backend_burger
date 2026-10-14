@@ -17,7 +17,7 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - AWS SQS: background tasks
 - AWS S3 and CloudWatch: long-term and application logs
 
-MongoDB and the AWS services are external dependencies. Docker Compose starts Redis and the backend service; the MongoDB service is currently disabled in `docker-compose.yml`.
+MongoDB and the AWS services are external dependencies by default. Docker Compose starts Redis and the backend service; use the local Compose override below to run MongoDB locally.
 
 ## Initial setup
 
@@ -62,6 +62,39 @@ uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
+
+## Local MongoDB
+
+Start MongoDB 7.0.2 for host-based development:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d mongodb_burger
+docker exec mongodb_burger mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
+```
+
+The local setup uses MongoDB 7.0.2 to avoid MongoDB and Orbstack kernel compatibility issues with MongoDB 8.
+
+Run the application against the local services:
+
+```bash
+DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
+REDIS_HOST=localhost \
+uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Run the test suite against the local MongoDB instance:
+
+```bash
+DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
+REDIS_HOST=localhost \
+uv run pytest . -s -v -W ignore
+```
+
+Stop the local dependencies:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml down
+```
 
 ## API
 

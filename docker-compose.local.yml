@@ -1,0 +1,11 @@
+services:
+  mongodb_burger:
+    image: mongodb/mongodb-community-server:7.0.2-ubuntu2204
+    container_name: mongodb_burger
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - ~/docker_data/mongo:/data/db
+    networks:
+      - backend_burger_network
