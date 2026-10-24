@@ -129,7 +129,6 @@ def initialize_logger(
     else:
         configuration["sink"] = filename
 
-    logger.remove(0)
     logger.add(**configuration)
 
 
