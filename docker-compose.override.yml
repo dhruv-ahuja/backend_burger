@@ -1,4 +1,11 @@
 services:
+  backend_burger:
+    environment:
+      DB_URL: mongodb://mongodb_burger:27017/backendBurger?replicaSet=rs0&directConnection=true
+      APP_ENVIRONMENT: dev
+    depends_on:
+      - mongodb_burger
+
   mongodb_burger:
     image: mongodb/mongodb-community-server:7.0.2-ubuntu2204
     container_name: mongodb_burger
@@ -9,3 +16,4 @@ services:
       - ~/docker_data/mongo:/data/db
     networks:
       - backend_burger_network
+    restart: unless-stopped
