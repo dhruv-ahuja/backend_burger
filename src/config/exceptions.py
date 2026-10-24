@@ -55,9 +55,6 @@ async def handle_not_found_exception(request: Request, exc: Exception) -> Respon
     exc = cast(HTTPException, exc)
     status_code = exc.status_code
 
-    path = request.url.path
-    logger.error(f"hit invalid enpoint: {path}")
-
     error = ERROR_MAPPING[status_code]
     message = exc.detail if exc.detail else error.message
 
@@ -71,9 +68,6 @@ async def handle_method_not_allowed_exception(request: Request, exc: Exception) 
     exc = cast(HTTPException, exc)
     status_code = exc.status_code
 
-    path = request.url.path
-    logger.error(f"request at endpoint {path} with invalid method {request.method}")
-
     error = ERROR_MAPPING[status_code]
 
     response = BaseResponse(data=None, error=BaseError(type=error.type_, message=error.message))
@@ -85,9 +79,6 @@ async def handle_invalid_input_exception(request: Request, exc: Exception) -> Re
 
     exc = cast(HTTPException, exc)
     status_code = exc.status_code
-
-    path = request.url.path
-    logger.error(f"request at endpoint {path} with invalid method {request.method}")
 
     error = ERROR_MAPPING[status_code]
     message = exc.detail if exc.detail else error.message
@@ -101,10 +92,7 @@ async def handle_auth_exception(request: Request, exc: Exception) -> Response:
 
     exc = cast(HTTPException, exc)
     status_code = exc.status_code
-
-    path = request.url.path
-    logger.error(f"request at endpoint {path} with invalid method {request.method}")
-
+    
     error = ERROR_MAPPING[status_code]
 
     response = BaseResponse(data=None, error=BaseError(type=error.type_, message=error.message))
