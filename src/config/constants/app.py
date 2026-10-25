@@ -18,7 +18,7 @@ PASSWORD_REGEX = r"^(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\/\-])(?=.*\d)(?=.*[a-z])(?
 
 INTERNAL_SCHEMA_MODELS = ["BaseResponse", "BaseError"]
 
-ACCESS_TOKEN_DURATION = dt.timedelta(weeks=30)
+ACCESS_TOKEN_DURATION = dt.timedelta(minutes=30)
 REFRESH_TOKEN_DURATION = dt.timedelta(days=15)
 
 # * cache duration in seconds
