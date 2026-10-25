@@ -66,6 +66,20 @@ uv run opentelemetry-instrument uvicorn src.main:app --reload --host 0.0.0.0 --p
 
 The application is available at `http://localhost:8000`.
 
+## OpenTelemetry
+
+The Docker image installs the applicable OpenTelemetry instrumentors during the build and starts the application
+through `opentelemetry-instrument`.
+
+Docker Compose defaults `OTEL_EXPORTER_OTLP_ENDPOINT` to `http://host.docker.internal:4317`, which sends telemetry
+from the backend container to a collector running on the Docker host. Docker Desktop and OrbStack resolve this name
+on macOS; the Compose `host-gateway` mapping provides the same name on Linux.
+
+On a Linux host, the collector must listen on an address reachable through the Docker bridge, such as
+`0.0.0.0:4317`, rather than only `127.0.0.1:4317`. Override `OTEL_EXPORTER_OTLP_ENDPOINT` when using a collector on
+another machine or network. Supply `OTEL_EXPORTER_OTLP_HEADERS` separately when authentication is required, and do
+not commit authentication headers to the repository.
+
 ## Local MongoDB and Redis
 
 Start MongoDB 7.0.2 and Redis for host-based development:
@@ -152,8 +166,8 @@ export VERSION=latest
 docker compose up --build -d
 ```
 
-The container starts through `opentelemetry-instrument`. Supply `OTEL_EXPORTER_OTLP_ENDPOINT` and, when required,
-`OTEL_EXPORTER_OTLP_HEADERS` through the shell, `.env`, or deployment configuration.
+Supply `OTEL_EXPORTER_OTLP_ENDPOINT` and, when required, `OTEL_EXPORTER_OTLP_HEADERS` through the shell, `.env`, or
+deployment configuration to override the local default.
 
 Follow the application logs:
 

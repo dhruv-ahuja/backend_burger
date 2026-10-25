@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /home/myuser/webapp
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
-RUN .venv/bin/opentelemetry-bootstrap --action=install
+RUN uv run opentelemetry-bootstrap --action=install
 
 FROM python:3.11-slim AS runner-image
 

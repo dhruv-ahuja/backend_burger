@@ -11,12 +11,15 @@ services:
       - "--requirepass ${REDIS_PASSWORD}"
     volumes:
       - ~/docker_data/redis:/data
+    # env_file:
+    #   - .env.backend_burger
     networks:
       - backend_burger_network 
 
   backend_burger: 
-    image: backend_burger:${VERSION}
+    image: dhruvahuja/backend_burger
     container_name: backend_burger
+    restart: unless-stopped
     build:
       context: .
     environment:
@@ -34,14 +37,21 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - APP_ENVIRONMENT=prod
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-backend_burger}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://host.docker.internal:4317}
+      - OTEL_EXPORTER_OTLP_HEADERS=${OTEL_EXPORTER_OTLP_HEADERS}
+      - OTEL_RESOURCE_ATTRIBUTES="deployment.environment.name=prod,service.version=0.2.0"
     env_file:
       - .env
+      # - .env.backend_burger
     ports:
       - "8000:8000"
     networks:
       - backend_burger_network
     depends_on:
       - redis_burger
+    extra_hosts:
+      # Map host.docker.internal to the host machine on Linux.
+      - "host.docker.internal:host-gateway"
   
 networks:
   backend_burger_network:

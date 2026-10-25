@@ -7,7 +7,6 @@ services:
     environment:
       DB_URL: mongodb://mongodb_burger:27017/backendBurger?replicaSet=rs0&directConnection=true
       APP_ENVIRONMENT: dev
-      OTEL_SERVICE_NAME: backend_burger
     depends_on:
       - mongodb_burger
 
