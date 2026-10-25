@@ -8,14 +8,14 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - Beanie ODM on top of MongoDB
 - Pydantic v2 for all schemas, models and validation needs
 - Ruff for formatting and linting code
-- AWS Services: Cloudwatch to gather logs, S3 Bucket to store logs for long durations, SQS to handle background tasks
+- AWS Services: S3 Bucket to archive logs and SQS to handle background tasks
 
 ## Services
 
 - MongoDB: application database configured through `DB_URL`
 - Redis: response and user-session caching
 - AWS SQS: background tasks
-- AWS S3 and CloudWatch: long-term and application logs
+- AWS S3: long-term log archive
 
 MongoDB and the AWS services are external dependencies by default. Docker Compose starts Redis and the backend service; use the local Compose override below to run MongoDB locally.
 
@@ -36,8 +36,10 @@ DB_PASSWORD=<your-database-password>
 DB_URL=<your-database-url>
 JWT_SECRET_KEY=<your-jwt-secret-key>
 REDIS_HOST=<your-redis-host>
+REDIS_PORT=6379
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
+OTEL_SERVICE_NAME=backend_burger
 ```
 
 For a local setup, set `APP_ENVIRONMENT=dev`. By default, the Docker Compose service sets `APP_ENVIRONMENT=prod` for containerized runs.
@@ -58,36 +60,56 @@ uv creates the environment in `.venv` at the project root. The commands below us
 Install the dependencies and run the FastAPI application locally:
 
 ```bash
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+OTEL_SERVICE_NAME=backend_burger \
+uv run opentelemetry-instrument uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
 
-## Local MongoDB
+## OpenTelemetry
 
-Start MongoDB 7.0.2 for host-based development:
+The Docker image installs the applicable OpenTelemetry instrumentors during the build and starts the application
+through `opentelemetry-instrument`.
+
+Docker Compose defaults `OTEL_EXPORTER_OTLP_ENDPOINT` to `http://host.docker.internal:4317`, which sends telemetry
+from the backend container to a collector running on the Docker host. Docker Desktop and OrbStack resolve this name
+on macOS; the Compose `host-gateway` mapping provides the same name on Linux.
+
+On a Linux host, the collector must listen on an address reachable through the Docker bridge, such as
+`0.0.0.0:4317`, rather than only `127.0.0.1:4317`. Override `OTEL_EXPORTER_OTLP_ENDPOINT` when using a collector on
+another machine or network. Supply `OTEL_EXPORTER_OTLP_HEADERS` separately when authentication is required, and do
+not commit authentication headers to the repository.
+
+## Local MongoDB and Redis
+
+Start MongoDB 7.0.2 and Redis for host-based development:
 
 ```bash
-docker compose up -d mongodb_burger
+docker compose up -d mongodb_burger redis_burger
 docker exec mongodb_burger mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
 ```
 
 The local setup uses MongoDB 7.0.2 to avoid MongoDB and Orbstack kernel compatibility issues with MongoDB 8.
 `docker-compose.override.yml` is loaded automatically and extends `docker-compose.yml` for local development.
+It publishes MongoDB on host port `27017` and Redis on host port `6379`. Containers reach Redis at
+`redis_burger:6379`, while applications and tests running directly on the host use `localhost:6379`.
 
 Run the application against the local services:
 
 ```bash
 DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
 REDIS_HOST=localhost \
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+REDIS_PORT=6379 \
+OTEL_SERVICE_NAME=backend_burger \
+uv run opentelemetry-instrument uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Run the test suite against the local MongoDB instance:
+Run the test suite against the local MongoDB and Redis instances:
 
 ```bash
 DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
 REDIS_HOST=localhost \
+REDIS_PORT=6379 \
 uv run pytest . -s -v -W ignore
 ```
 
@@ -143,6 +165,9 @@ Build and start the application with Redis:
 export VERSION=latest
 docker compose up --build -d
 ```
+
+Supply `OTEL_EXPORTER_OTLP_ENDPOINT` and, when required, `OTEL_EXPORTER_OTLP_HEADERS` through the shell, `.env`, or
+deployment configuration to override the local default.
 
 Follow the application logs:
 

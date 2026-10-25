@@ -133,5 +133,8 @@ dmypy.json
 # AWS deployment env vars
 backend_burger_aws.env
 
+# Local database backups
+/backups/
+
 # poe data
 itemData/
