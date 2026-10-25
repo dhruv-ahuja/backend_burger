@@ -14,7 +14,6 @@ dependencies = [
     "httpx==0.26.0",
     "loguru==0.7.2",
     "motor==3.3.1",
-    "mypy-boto3-logs==1.28.83",
     "mypy-boto3-s3==1.28.55",
     "mypy-boto3-sqs==1.28.82",
     "numpy==2.0.0",
@@ -37,7 +36,6 @@ dependencies = [
     "setuptools==68.2.2",
     "statsmodels==0.14.2",
     "uvicorn==0.24.0.post1",
-    "watchtower==3.0.1",
 ]
 
 [dependency-groups]

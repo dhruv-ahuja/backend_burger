@@ -16,7 +16,6 @@ from boto3.resources.base import ServiceResource
 from fastapi import FastAPI
 from loguru import logger
 from motor.motor_asyncio import AsyncIOMotorClient
-from mypy_boto3_logs.client import CloudWatchLogsClient
 from mypy_boto3_s3 import S3ServiceResource
 from mypy_boto3_s3.service_resource import Bucket
 from mypy_boto3_sqs import SQSServiceResource
@@ -24,7 +23,6 @@ from mypy_boto3_sqs.service_resource import Queue
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis.asyncio import Redis
-from watchtower import CloudWatchLogHandler
 
 from src.config.constants import app, logs
 from src.config.logging import instrument_loguru
@@ -34,7 +32,6 @@ from src.utils import jobs
 # TODO: split settings, observability, infrastructure clients, and application lifespan into dedicated modules.
 
 class AwsService(str, Enum):
-    CloudwatchLogs = "logs"
     SQS = "sqs"
     S3 = "s3"
 
@@ -88,17 +85,11 @@ def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> bo
     return session
 
 
-def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResource | CloudWatchLogsClient:
+def get_aws_service(service: AwsService, session: boto3.Session) -> ServiceResource:
     """Gets and returns the AWS resource object's instance."""
 
     try:
-        match service.value:
-            case "sqs" | "s3":
-                client = session.resource(service.value)
-            case "logs":
-                client = session.client(service.value)
-            case _:
-                raise ValueError("Enter a valid aws service.")
+        client = session.resource(service.value)
     except boto3.exceptions.Boto3Error as exc:
         logger.error(f"error accessing {service} AWS service: {exc}")
         raise
@@ -131,30 +122,7 @@ def initialize_logger(
     logger.add(**configuration)
 
 
-def initialize_cloudwatch_handler(
-    client: ServiceResource | CloudWatchLogsClient,
-    log_group: str,
-    log_stream: str | None = None,
-    retention_period: int = 30,
-):
-    """Initializes and registers the CloudWatch Logs handler with the application logger."""
-
-    # * workaround to narrow the union type
-    client = t.cast(CloudWatchLogsClient, client)
-
-    configuration = {
-        "log_group_name": log_group,
-        "log_group_retention_days": retention_period,
-        "boto3_client": client,
-    }
-    if log_stream is not None:
-        configuration["log_stream_name"] = log_stream
-
-    handler = CloudWatchLogHandler(**configuration)
-    logger.add(handler)
-
-
-def get_sqs_queue(client: ServiceResource | CloudWatchLogsClient, queue_name: str) -> Queue:
+def get_sqs_queue(client: ServiceResource, queue_name: str) -> Queue:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
@@ -169,7 +137,7 @@ def get_sqs_queue(client: ServiceResource | CloudWatchLogsClient, queue_name: st
     return queue
 
 
-def get_s3_bucket(s3: ServiceResource | CloudWatchLogsClient, bucket_name: str) -> Bucket:
+def get_s3_bucket(s3: ServiceResource, bucket_name: str) -> Bucket:
     """Fetches and returns an existing queue from the SQS resouce."""
 
     # * workaround to narrow the union type
@@ -191,9 +159,6 @@ def initialize_aws_services(
     function calls in one place."""
 
     queue = bucket = None
-
-    cloudwatch_client = get_aws_service(AwsService.CloudwatchLogs, aws_session)
-    initialize_cloudwatch_handler(cloudwatch_client, app.LOG_GROUP_NAME, app.PROJECT_NAME)
 
     if init_queue:
         sqs_client = get_aws_service(AwsService.SQS, aws_session)

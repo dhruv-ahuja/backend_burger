@@ -108,7 +108,6 @@ dependencies = [
     { name = "httpx" },
     { name = "loguru" },
     { name = "motor" },
-    { name = "mypy-boto3-logs" },
     { name = "mypy-boto3-s3" },
     { name = "mypy-boto3-sqs" },
     { name = "numpy" },
@@ -131,7 +130,6 @@ dependencies = [
     { name = "setuptools" },
     { name = "statsmodels" },
     { name = "uvicorn" },
-    { name = "watchtower" },
 ]
 
 [package.dev-dependencies]
@@ -156,7 +154,6 @@ requires-dist = [
     { name = "httpx", specifier = "==0.26.0" },
     { name = "loguru", specifier = "==0.7.2" },
     { name = "motor", specifier = "==3.3.1" },
-    { name = "mypy-boto3-logs", specifier = "==1.28.83" },
     { name = "mypy-boto3-s3", specifier = "==1.28.55" },
     { name = "mypy-boto3-sqs", specifier = "==1.28.82" },
     { name = "numpy", specifier = "==2.0.0" },
@@ -179,7 +176,6 @@ requires-dist = [
     { name = "setuptools", specifier = "==68.2.2" },
     { name = "statsmodels", specifier = "==0.14.2" },
     { name = "uvicorn", specifier = "==0.24.0.post1" },
-    { name = "watchtower", specifier = "==3.0.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -670,18 +666,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c5/3a/7bc74c77b07162bdbdf7792d6a75a763d7d29a58e6eab32dcff53f7b4fc6/motor-3.3.1.tar.gz", hash = "sha256:c5eb400e27d722a3db03a9826656b6d13acf9b6c70c2fb4604f474eac9da5be4", size = 270627, upload-time = "2023-08-31T20:40:55.567Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d1/b3/7be664976abdb25912ed987ea2cf9416fd8c9b3d035ab0455f56f06474a7/motor-3.3.1-py3-none-any.whl", hash = "sha256:a0dee83ad0d47b353932ac37467ba397b1e649ce7e3eea7f5a90554883d7cdbe", size = 70100, upload-time = "2023-08-31T20:40:30.316Z" },
-]
-
-[[package]]
-name = "mypy-boto3-logs"
-version = "1.28.83"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/12/06/f61da38bd61acbbcdcc2df77f8a8ec455cad9f6174decaa70307f15d5492/mypy-boto3-logs-1.28.83.tar.gz", hash = "sha256:88217ea551bd1c7b95d27901137f52e0c11598f02308772659d0f27fb74942c7", size = 33273, upload-time = "2023-11-09T20:49:27.064Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/61/230abb2402933f7dc656dfa73ceaecc79296213ed43035fca4114f8c4afc/mypy_boto3_logs-1.28.83-py3-none-any.whl", hash = "sha256:bf574da546aab607bce8760f47c02b276b64ca8821acd0ab4c9ac1442639a90c", size = 38448, upload-time = "2023-11-09T20:49:13.918Z" },
 ]
 
 [[package]]
@@ -1635,18 +1619,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/92/cc/a3c3f557992a20a5bb24607f0da44d39cf6d6ba3f8f6ed7cb31f6c73371a/watchfiles-1.3.0-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:6398d250994baff581147ccba846223076fe6492ca93c0d1b3588fcf5355eb5c", size = 394852, upload-time = "2026-09-21T09:08:51.412Z" },
     { url = "https://files.pythonhosted.org/packages/55/65/d45763a5e1108a65af85a217af2930ebf1081c73fd8169d3f75e586992bb/watchfiles-1.3.0-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:591de392458bca26f6130fea4e667c06b657e873ad334ea06fad5a79f5086cef", size = 451789, upload-time = "2026-09-21T09:08:53.144Z" },
     { url = "https://files.pythonhosted.org/packages/02/96/165c6e540bf765ca1115062017adf861d0816525f02464ba71313fe7cf92/watchfiles-1.3.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5ec46a1ff4c1d81405a5fc645abdbff5e4e9388f7c9a6cdb392316a7c29b884f", size = 456919, upload-time = "2026-09-21T09:08:54.372Z" },
-]
-
-[[package]]
-name = "watchtower"
-version = "3.0.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "boto3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/6e/5a0fbc27d40421ad7c82b6b14ba963e53877f59b2fe73d50fc14d55fc588/watchtower-3.0.1.tar.gz", hash = "sha256:e60b828e9c368d54044a631466322e8c6f5f9d57da0b69fbaf32ec134697367e", size = 24788, upload-time = "2023-01-29T15:33:54.691Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/23/41/36c7246c1c273fd316d9b8b81581074becc3137135f9ccd6307960a7879c/watchtower-3.0.1-py3-none-any.whl", hash = "sha256:566874a9dee34b90517b9a9b7c2d5e6b15fb9fd00dacb03bff8a7bf4c6295fe0", size = 17331, upload-time = "2023-01-29T15:33:52.494Z" },
 ]
 
 [[package]]

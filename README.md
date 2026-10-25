@@ -8,14 +8,14 @@ Backend API for [Winter Orb](https://winter-orb.vercel.app/), a full-stack Path 
 - Beanie ODM on top of MongoDB
 - Pydantic v2 for all schemas, models and validation needs
 - Ruff for formatting and linting code
-- AWS Services: Cloudwatch to gather logs, S3 Bucket to store logs for long durations, SQS to handle background tasks
+- AWS Services: S3 Bucket to archive logs and SQS to handle background tasks
 
 ## Services
 
 - MongoDB: application database configured through `DB_URL`
 - Redis: response and user-session caching
 - AWS SQS: background tasks
-- AWS S3 and CloudWatch: long-term and application logs
+- AWS S3: long-term log archive
 
 MongoDB and the AWS services are external dependencies by default. Docker Compose starts Redis and the backend service; use the local Compose override below to run MongoDB locally.
 

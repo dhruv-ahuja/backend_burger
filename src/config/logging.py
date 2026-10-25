@@ -1,6 +1,5 @@
 import logging
 import sys
-import typing as t
 
 from loguru import logger
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
