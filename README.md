@@ -39,6 +39,7 @@ REDIS_HOST=<your-redis-host>
 REDIS_PORT=6379
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
+OTEL_SERVICE_NAME=backend_burger
 ```
 
 For a local setup, set `APP_ENVIRONMENT=dev`. By default, the Docker Compose service sets `APP_ENVIRONMENT=prod` for containerized runs.
@@ -59,7 +60,8 @@ uv creates the environment in `.venv` at the project root. The commands below us
 Install the dependencies and run the FastAPI application locally:
 
 ```bash
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+OTEL_SERVICE_NAME=backend_burger \
+uv run opentelemetry-instrument uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The application is available at `http://localhost:8000`.
@@ -84,7 +86,8 @@ Run the application against the local services:
 DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
 REDIS_HOST=localhost \
 REDIS_PORT=6379 \
-uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+OTEL_SERVICE_NAME=backend_burger \
+uv run opentelemetry-instrument uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Run the test suite against the local MongoDB and Redis instances:
@@ -148,6 +151,9 @@ Build and start the application with Redis:
 export VERSION=latest
 docker compose up --build -d
 ```
+
+The container starts through `opentelemetry-instrument`. Supply `OTEL_EXPORTER_OTLP_ENDPOINT` and, when required,
+`OTEL_EXPORTER_OTLP_HEADERS` through the shell, `.env`, or deployment configuration.
 
 Follow the application logs:
 

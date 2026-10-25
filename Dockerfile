@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /home/myuser/webapp
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
+RUN .venv/bin/opentelemetry-bootstrap --action=install
 
 FROM python:3.11-slim AS runner-image
 
@@ -39,4 +40,4 @@ RUN mkdir -p /home/myuser/log
 EXPOSE 8000
 
 # using /dev/shm as the worker temp dir will help prevent random locks and freezes used for gunicorn heartbeat
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]
+CMD ["opentelemetry-instrument", "gunicorn", "-b", "0.0.0.0:8000", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "--worker-tmp-dir", "/dev/shm", "src.main:app"]
