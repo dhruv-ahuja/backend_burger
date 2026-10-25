@@ -31,6 +31,7 @@ from src.utils import jobs
 
 # TODO: split settings, observability, infrastructure clients, and application lifespan into dedicated modules.
 
+
 class AwsService(str, Enum):
     SQS = "sqs"
     S3 = "s3"
@@ -53,6 +54,7 @@ class Settings(BaseSettings):
     jwt_secret_key: SecretStr
 
     redis_host: str
+    redis_port: int = 6379
     redis_password: SecretStr | None = None
     app_environment: str
 
@@ -186,10 +188,10 @@ async def connect_to_mongodb(document_models: list[t.Type[beanie.Document]]) -> 
     logger.info("successfully connected to database")
 
 
-def initialize_redis_service(redis_host: str, redis_password: str | None) -> Redis:
+def initialize_redis_service(redis_host: str, redis_port: int, redis_password: str | None) -> Redis:
     """Connects to the redis database given its host and password, and establishes an async connection."""
 
-    redis_client = Redis(host=redis_host, password=redis_password, decode_responses=False)
+    redis_client = Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=False)
     return redis_client
 
 
@@ -219,7 +221,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
         redis_password = settings.redis_password.get_secret_value()
     else:
         redis_password = None
-    redis_client = initialize_redis_service(settings.redis_host, redis_password)
+    redis_client = initialize_redis_service(settings.redis_host, settings.redis_port, redis_password)
 
     async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()

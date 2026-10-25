@@ -36,6 +36,7 @@ DB_PASSWORD=<your-database-password>
 DB_URL=<your-database-url>
 JWT_SECRET_KEY=<your-jwt-secret-key>
 REDIS_HOST=<your-redis-host>
+REDIS_PORT=6379
 REDIS_PASSWORD=<your-redis-password>
 APP_ENVIRONMENT=dev
 ```
@@ -63,31 +64,35 @@ uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 The application is available at `http://localhost:8000`.
 
-## Local MongoDB
+## Local MongoDB and Redis
 
-Start MongoDB 7.0.2 for host-based development:
+Start MongoDB 7.0.2 and Redis for host-based development:
 
 ```bash
-docker compose up -d mongodb_burger
+docker compose up -d mongodb_burger redis_burger
 docker exec mongodb_burger mongosh --quiet --eval 'rs.initiate({_id: "rs0", members: [{_id: 0, host: "localhost:27017"}]})'
 ```
 
 The local setup uses MongoDB 7.0.2 to avoid MongoDB and Orbstack kernel compatibility issues with MongoDB 8.
 `docker-compose.override.yml` is loaded automatically and extends `docker-compose.yml` for local development.
+It publishes MongoDB on host port `27017` and Redis on host port `6379`. Containers reach Redis at
+`redis_burger:6379`, while applications and tests running directly on the host use `localhost:6379`.
 
 Run the application against the local services:
 
 ```bash
 DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
 REDIS_HOST=localhost \
+REDIS_PORT=6379 \
 uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Run the test suite against the local MongoDB instance:
+Run the test suite against the local MongoDB and Redis instances:
 
 ```bash
 DB_URL='mongodb://localhost:27017/backendBurger?replicaSet=rs0' \
 REDIS_HOST=localhost \
+REDIS_PORT=6379 \
 uv run pytest . -s -v -W ignore
 ```
 

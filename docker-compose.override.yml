@@ -1,4 +1,8 @@
 services:
+  redis_burger:
+    ports:
+      - "6379:6379"
+
   backend_burger:
     environment:
       DB_URL: mongodb://mongodb_burger:27017/backendBurger?replicaSet=rs0&directConnection=true
