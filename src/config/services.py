@@ -27,12 +27,11 @@ from redis.asyncio import Redis
 from watchtower import CloudWatchLogHandler
 
 from src.config.constants import app, logs
+from src.config.logging import instrument_loguru
 from src.models import document_models
 from src.utils import jobs
 
-
-# TODO: break this module into submodules
-
+# TODO: split settings, observability, infrastructure clients, and application lifespan into dedicated modules.
 
 class AwsService(str, Enum):
     CloudwatchLogs = "logs"
@@ -237,6 +236,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     functions."""
 
     path = pathlib.Path(logs.LOGS_DIRECTORY)
+    instrument_loguru()
     initialize_logger(logs.LOGGER_MESSAGE_FORMAT, path, logs.LOGGER_FILENAME_FORMAT)
 
     logger.debug("application startup, setting up services")
