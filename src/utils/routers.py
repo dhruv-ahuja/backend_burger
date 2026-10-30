@@ -1,5 +1,6 @@
 import math
-from typing import Any, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from loguru import logger
 from redis.asyncio import Redis
@@ -11,15 +12,15 @@ from src.utils.services import cache_data, get_cached_data, serialize_response
 
 async def get_or_cache_serialized_entity(
     redis_key: str,
-    get_entity_function: Awaitable | None,
+    get_entity_function: Callable[[], Awaitable] | None,
     response_key: str | None,
     expire_in: int | None,
     redis_client: Redis,
     response: BaseResponse | None = None,
 ) -> bytes:
-    """Checks whether the serialized details are present in the cache. Awaits the given `get_entity_function` to get and cache this
-    data from the database, if the details were not found. Uses the `response` value if its available, instead of
-    awaiting the function call.
+    """Checks whether the serialized details are present in the cache. Calls and awaits `get_entity_function` to get
+    and cache data from the database only when the details were not found. Uses `response`, when provided, instead of
+    calling the entity function.
 
     `response_key` sets the custom response object key for the `BaseResponse` instance."""
 
@@ -36,7 +37,7 @@ async def get_or_cache_serialized_entity(
     else:
         assert get_entity_function is not None
 
-        data = await get_entity_function
+        data = await get_entity_function()
         if isinstance(data, BaseResponse):
             serialized_entity = serialize_response(data)
         else:

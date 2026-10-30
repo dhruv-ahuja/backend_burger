@@ -64,7 +64,7 @@ async def get_user_from_database(user_id: PydanticObjectId | None, user_email: s
     return user
 
 
-async def get_user(user_id: PydanticObjectId | None, user_email: str | None = None) -> UserBase:
+async def get_user(user_id: PydanticObjectId | None, user_email: str | None = None) -> UserBaseResponse:
     """Fetches and returns a user from the database, if user exists, given the user ID or email."""
 
     if user_id is user_email is None:

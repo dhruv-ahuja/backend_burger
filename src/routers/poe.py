@@ -56,7 +56,6 @@ async def get_items(
         # * get available cached data or cache the data and prepare api resposne
         redis_key = f"{redis_key}:f_{filter_key}:p_{page}"
         response = await router_utils.get_or_cache_serialized_entity(
-            redis_key, get_items_response(), None, consts.ITEMS_CACHE_DURATION, redis_client
-        )
+            redis_key, get_items_response, None, consts.ITEMS_CACHE_DURATION, redis_client        )
 
     return AppResponse(response)
