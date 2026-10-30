@@ -195,6 +195,13 @@ def initialize_redis_service(redis_host: str, redis_port: int, redis_password: s
     return redis_client
 
 
+def initialize_configured_redis_service() -> Redis:
+    """Initialize Redis using the application's parsed settings."""
+
+    redis_password = settings.redis_password.get_secret_value() if settings.redis_password is not None else None
+    return initialize_redis_service(settings.redis_host, settings.redis_port, redis_password)
+
+
 @asynccontextmanager
 async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
     """Sets up connections to and initializes required services on FastAPI app startup. These services live throughout
@@ -217,11 +224,7 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
     await connect_to_mongodb(document_models)
 
-    if settings.redis_password is not None:
-        redis_password = settings.redis_password.get_secret_value()
-    else:
-        redis_password = None
-    redis_client = initialize_redis_service(settings.redis_host, settings.redis_port, redis_password)
+    redis_client = initialize_configured_redis_service()
 
     async_scheduler = AsyncIOScheduler()
     scheduler = BackgroundScheduler()

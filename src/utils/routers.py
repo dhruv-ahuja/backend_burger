@@ -1,49 +1,68 @@
 import math
-from typing import Any, Awaitable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from loguru import logger
-from redis.asyncio import Redis
+from redis.asyncio import Redis, RedisError
 
 from src.schemas.requests import PaginationInput
 from src.schemas.responses import BaseResponse, PaginationResponse
-from src.utils.services import cache_data, get_cached_data, serialize_response
+from src.utils.services import cache_data, get_cached_data, record_cache_outcome, serialize_response
 
 
 async def get_or_cache_serialized_entity(
     redis_key: str,
-    get_entity_function: Awaitable | None,
+    get_entity_function: Callable[[], Awaitable[Any]] | None,
     response_key: str | None,
     expire_in: int | None,
     redis_client: Redis,
     response: BaseResponse | None = None,
+    *,
+    fail_open: bool = False,
+    cache_namespace: str,
 ) -> bytes:
-    """Checks whether the serialized details are present in the cache. Awaits the given `get_entity_function` to get and cache this
-    data from the database, if the details were not found. Uses the `response` value if its available, instead of
-    awaiting the function call.
+    """Checks whether the serialized details are present in the cache. Calls and awaits `get_entity_function` to get
+    and cache data from the database only when the details were not found. Uses `response`, when provided, instead of
+    calling the entity function.
 
-    `response_key` sets the custom response object key for the `BaseResponse` instance."""
+    `response_key` sets the custom response object key for the `BaseResponse` instance. `cache_namespace` identifies
+    this cache in structured logs and traces. When `fail_open` is true, Redis errors bypass the cache without
+    preventing the source response from being returned."""
 
-    serialized_entity = await get_cached_data(redis_key, redis_client)
+    async def get_serialized_entity() -> bytes:
+        if response is not None:
+            return serialize_response(response)
 
-    if serialized_entity is not None:
-        logger.debug(f"found cached '{redis_key}' data")
-        return serialized_entity
-
-    logger.debug(f"'{redis_key}' not in cache, serializing and adding")
-
-    if response is not None:
-        serialized_entity = serialize_response(response)
-    else:
         assert get_entity_function is not None
 
-        data = await get_entity_function
+        data = await get_entity_function()
         if isinstance(data, BaseResponse):
-            serialized_entity = serialize_response(data)
-        else:
-            serialized_entity = serialize_response(BaseResponse(data=data, key=response_key))
+            return serialize_response(data)
 
-    await cache_data(redis_key, serialized_entity, expire_in, redis_client)
-    logger.debug(f"cached '{redis_key}' data")
+        return serialize_response(BaseResponse(data=data, key=response_key))
+
+    try:
+        serialized_entity = await get_cached_data(redis_key, redis_client)
+    except RedisError:
+        record_cache_outcome(cache_namespace, "read_error")
+        if not fail_open:
+            raise
+
+        return await get_serialized_entity()
+
+    if serialized_entity is not None:
+        record_cache_outcome(cache_namespace, "hit")
+        return serialized_entity
+
+    record_cache_outcome(cache_namespace, "miss")
+
+    serialized_entity = await get_serialized_entity()
+
+    try:
+        await cache_data(redis_key, serialized_entity, expire_in, redis_client)
+    except RedisError:
+        record_cache_outcome(cache_namespace, "write_error")
+        if not fail_open:
+            raise
 
     return serialized_entity
 
