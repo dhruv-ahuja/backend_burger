@@ -50,6 +50,7 @@ async def get_items(
             None,
             consts.ITEMS_CACHE_DURATION,
             redis_client,
+            fail_open=True,
         )
 
     return AppResponse(response)
