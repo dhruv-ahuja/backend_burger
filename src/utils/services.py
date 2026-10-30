@@ -1,10 +1,11 @@
 import copy
-from typing import Self, Type, cast
+from typing import Literal, Self, Type, cast
 
 from beanie import Document
 from beanie.odm.operators.find.evaluation import RegEx as RegExOperator
 from bson import Decimal128
 from loguru import logger
+from opentelemetry.trace import get_current_span
 import orjson
 import pymongo
 from redis.asyncio import Redis, RedisError
@@ -12,6 +13,34 @@ from redis.asyncio import Redis, RedisError
 from src.config.constants.app import FILTER_OPERATION_MAP, FIND_MANY_QUERY, NESTED_FILTER_OPERATION_MAP
 from src.schemas.requests import FilterInputType, FilterSchema, PaginationInput, SortInputType, SortSchema
 from src.schemas.responses import E, T, BaseResponse
+
+
+CacheStatus = Literal["hit", "miss", "bypass", "read_error", "write_error"]
+
+
+def record_cache_outcome(cache_namespace: str, cache_status: CacheStatus, *, reason: str | None = None) -> None:
+    """Record a structured cache outcome on both the application log and current trace span."""
+
+    log_attributes = {
+        "cache_system": "redis",
+        "cache_namespace": cache_namespace,
+        "cache_status": cache_status,
+    }
+    if reason is not None:
+        log_attributes["cache_reason"] = reason
+
+    level = "WARNING" if cache_status in ("read_error", "write_error") else "DEBUG"
+    logger.bind(**log_attributes).log(level, "cache outcome")
+
+    span = get_current_span()
+    if not span.is_recording():
+        return
+
+    span.set_attribute("cache.system", "redis")
+    span.set_attribute("cache.namespace", cache_namespace)
+    span.set_attribute("cache.status", cache_status)
+    if reason is not None:
+        span.set_attribute("cache.reason", reason)
 
 
 def serialize_response(response: BaseResponse[T, E] | bytes) -> bytes:

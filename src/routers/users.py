@@ -44,7 +44,12 @@ async def get_all_users(request: Request, _=Depends(deps.check_access_token)):
 
     get_user_function = service.get_users
     serialized_users = await routers_utils.get_or_cache_serialized_entity(
-        redis_key, get_user_function, "users", app.USERS_CACHE_DURATION, redis_client
+        redis_key,
+        get_user_function,
+        "users",
+        app.USERS_CACHE_DURATION,
+        redis_client,
+        cache_namespace=app.USER_CACHE_KEY,
     )
 
     return AppResponse(serialized_users)
@@ -61,7 +66,12 @@ async def get_current_user(request: Request, token_data=Depends(deps.check_acces
 
     get_user_function = partial(service.get_user, user_id)
     serialized_user = await routers_utils.get_or_cache_serialized_entity(
-        redis_key, get_user_function, None, app.SINGLE_USER_CACHE_DURATION, redis_client
+        redis_key,
+        get_user_function,
+        None,
+        app.SINGLE_USER_CACHE_DURATION,
+        redis_client,
+        cache_namespace=app.USER_CACHE_KEY,
     )
 
     return AppResponse(serialized_user)
@@ -78,7 +88,12 @@ async def get_user(request: Request, user_id: PydanticObjectId, _=Depends(deps.c
 
     get_user_function = partial(service.get_user, user_id)
     serialized_user = await routers_utils.get_or_cache_serialized_entity(
-        redis_key, get_user_function, None, app.SINGLE_USER_CACHE_DURATION, redis_client
+        redis_key,
+        get_user_function,
+        None,
+        app.SINGLE_USER_CACHE_DURATION,
+        redis_client,
+        cache_namespace=app.USER_CACHE_KEY,
     )
 
     return AppResponse(serialized_user)

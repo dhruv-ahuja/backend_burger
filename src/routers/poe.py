@@ -7,6 +7,7 @@ from src.schemas.web_responses import poe as resp
 from src.schemas.responses import AppResponse, BaseResponse
 from src.services import poe as service, poe_cache
 import src.utils.routers as router_utils
+from src.utils.services import record_cache_outcome
 
 
 router = APIRouter(prefix="/poe", tags=["Path of Exile"])
@@ -42,6 +43,7 @@ async def get_items(
     redis_key = poe_cache.build_items_cache_key(pagination, filter_sort_input)
 
     if redis_key is None:
+        record_cache_outcome(consts.ITEMS_CACHE_NAMESPACE, "bypass", reason="query_not_cacheable")
         response = await get_items_response()
     else:
         response = await router_utils.get_or_cache_serialized_entity(
@@ -51,6 +53,7 @@ async def get_items(
             consts.ITEMS_CACHE_DURATION,
             redis_client,
             fail_open=True,
+            cache_namespace=consts.ITEMS_CACHE_NAMESPACE,
         )
 
     return AppResponse(response)
