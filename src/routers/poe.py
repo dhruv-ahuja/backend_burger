@@ -10,7 +10,8 @@ from src.services import poe as service
 import src.utils.routers as router_utils
 
 
-dependencies = [Depends(deps.check_access_token)]
+# dependencies = [Depends(deps.check_access_token)]
+dependencies = []
 router = APIRouter(prefix="/poe", tags=["Path of Exile"], dependencies=dependencies)
 
 
