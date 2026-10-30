@@ -16,11 +16,13 @@ import motor
 from pydantic import BaseModel, Field, computed_field
 import pydantic
 import pymongo
+from redis.asyncio import RedisError
 
-from src.config.services import connect_to_mongodb
+from src.config.services import connect_to_mongodb, initialize_configured_redis_service
 from src.models import document_models
 from src.models.poe import Item, ItemCategory
 from src.schemas.poe import ItemIdType, ItemPrice
+from src.services.poe_cache import invalidate_items_cache
 
 
 @dataclass
@@ -440,10 +442,11 @@ async def save_items(item_records: list[Item]) -> bool:
     return True
 
 
-async def save_item_data(item_data_queue: Queue[list[Item] | None]) -> None:
-    """Gets item records in bulk from the item data queue and saves them to the database."""
+async def save_item_data(item_data_queue: Queue[list[Item] | None]) -> bool:
+    """Save queued item batches and report whether every database write succeeded."""
 
     batch_save_count = 1
+    all_batches_saved = True
     logger.debug("initiating saving items to DB")
 
     start = time.perf_counter()
@@ -459,12 +462,28 @@ async def save_item_data(item_data_queue: Queue[list[Item] | None]) -> None:
         if save_was_success:
             logger.debug(f"successfully saved batch {batch_save_count} of items to DB")
         else:
+            all_batches_saved = False
             logger.debug(f"failed to save batch {batch_save_count} of items to DB")
 
         batch_save_count += 1
 
     stop = time.perf_counter()
     logger.info(f"time taken to save all records to DB: {stop - start}")
+    return all_batches_saved
+
+
+async def invalidate_item_responses() -> None:
+    """Invalidate cached item responses after a successful database refresh."""
+
+    redis_client = initialize_configured_redis_service()
+    try:
+        deleted_count = await invalidate_items_cache(redis_client)
+    except RedisError as exc:
+        logger.error(f"item data was refreshed, but cached item responses could not be invalidated: {exc}")
+    else:
+        logger.info(f"invalidated {deleted_count} cached item responses")
+    finally:
+        await redis_client.aclose()
 
 
 async def main():
@@ -477,7 +496,12 @@ async def main():
     async with asyncio.TaskGroup() as tg:
         tg.create_task(prepare_api_data(api_item_data_queue))
         tg.create_task(parse_api_item_data(api_item_data_queue, item_data_queue))
-        tg.create_task(save_item_data(item_data_queue))
+        save_task = tg.create_task(save_item_data(item_data_queue))
+
+    if save_task.result():
+        await invalidate_item_responses()
+    else:
+        logger.warning("skipped item-response cache invalidation because one or more item batches failed to save")
 
 
 if __name__ == "__main__":

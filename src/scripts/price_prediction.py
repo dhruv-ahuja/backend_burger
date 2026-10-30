@@ -17,14 +17,16 @@ import pandas as pd
 from pydantic import BaseModel, BeforeValidator, Field, TypeAdapter
 import pydantic
 import pymongo
+from redis.asyncio import RedisError
 import statsmodels.api as sm
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 
-from src.config.services import connect_to_mongodb
+from src.config.services import connect_to_mongodb, initialize_configured_redis_service
 from src.models import document_models
 from src.models.poe import Item
 from src.schemas.poe import Currency, ItemPrice, PriceDatedData
+from src.services.poe_cache import invalidate_items_cache
 
 
 # TODO: handle extreme decimal case scenarios for items like Mirror of Kalandra
@@ -268,7 +270,7 @@ async def manage_prediction_data(
         logger.debug(f"time taken to predict for current batch: {time.perf_counter() - start}")
 
 
-async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None]) -> None:
+async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None]) -> bool:
     """Bulk-updates item data in the database. Serializes item price schema into a JSON object for insertion into
     the database. Creates an order of Pymongo-native `UpdateOne` operations and bulk writes them for efficiency over
     inserting each record one-by-one."""
@@ -276,13 +278,14 @@ async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None])
     item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
 
     batch_number = 1
+    all_batches_updated = True
     while True:
         bulk_operations = []
 
         updated_items = await updated_items_queue.get()
         if updated_items is None:
             logger.debug("finished updating all item records in database, exiting...")
-            return
+            return all_batches_updated
 
         for item in updated_items:
             assert item.price_info is not None
@@ -303,8 +306,23 @@ async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None])
 
             batch_number += 1
         except Exception as exc:
+            all_batches_updated = False
             logger.error(f"error bulk writing: {exc}")
             logger.error(f"{type(exc)}")
+
+
+async def invalidate_item_responses() -> None:
+    """Invalidate cached item responses after successful price updates."""
+
+    redis_client = initialize_configured_redis_service()
+    try:
+        deleted_count = await invalidate_items_cache(redis_client)
+    except RedisError as exc:
+        logger.error(f"item prices were refreshed, but cached item responses could not be invalidated: {exc}")
+    else:
+        logger.info(f"invalidated {deleted_count} cached item responses")
+    finally:
+        await redis_client.aclose()
 
 
 def prepare_item_price_data(
@@ -361,7 +379,12 @@ async def main():
         tg.create_task(push_items_to_queue(total_items, BATCH_SIZE, items_queue))
         tg.create_task(get_price_history_data(items_queue, price_history_queue))
         tg.create_task(manage_prediction_data(price_history_queue, updated_items_queue))
-        tg.create_task(update_items_data(updated_items_queue))
+        update_task = tg.create_task(update_items_data(updated_items_queue))
+
+    if update_task.result():
+        await invalidate_item_responses()
+    else:
+        logger.warning("skipped item-response cache invalidation because one or more price-update batches failed")
 
     logger.info(f"time taken for script execution: {time.perf_counter() - start}")
 

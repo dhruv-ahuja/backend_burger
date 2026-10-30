@@ -58,6 +58,27 @@ async def delete_cached_data(key: str, redis_client: Redis) -> None:
         raise
 
 
+async def delete_cached_data_matching(pattern: str, redis_client: Redis, scan_count: int = 100) -> int:
+    """Delete cache entries matching ``pattern`` without blocking Redis with a full keyspace lookup."""
+
+    cursor = 0
+    deleted_count = 0
+
+    try:
+        while True:
+            cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=scan_count)
+            if keys:
+                deleted_count += await redis_client.unlink(*keys)
+
+            if cursor == 0:
+                break
+    except RedisError as exc:
+        logger.error(f"error deleting cached data matching '{pattern}': {exc}")
+        raise
+
+    return deleted_count
+
+
 def sort_on_query(query: FIND_MANY_QUERY, model: Type[Document], sort: SortInputType) -> FIND_MANY_QUERY:
     """Parses, gathers and chains sort operations on the input query. Skips the process if sort input is empty."""
 

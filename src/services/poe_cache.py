@@ -2,9 +2,11 @@ import hashlib
 from typing import cast
 
 import orjson
+from redis.asyncio import Redis
 
 from src.config.constants import app as consts
 from src.schemas.requests import FilterSchema, FilterSortInput, PaginationInput, SortSchema
+from src.utils.services import delete_cached_data_matching
 
 
 CACHEABLE_FILTERS = {
@@ -59,8 +61,14 @@ def build_items_cache_key(
         "filters": sorted((entry.field, entry.operation, entry.value) for entry in filters),
         "sorts": [(entry.field, entry.operation) for entry in sorts],
     }
-    
+
     serialized_query = orjson.dumps(canonical_query, option=orjson.OPT_SORT_KEYS)
     query_digest = hashlib.sha256(serialized_query).hexdigest()
 
     return f"{consts.ITEMS_CACHE_NAMESPACE}:{query_digest}"
+
+
+async def invalidate_items_cache(redis_client: Redis) -> int:
+    """Delete every cached item response in the current cache-key namespace."""
+
+    return await delete_cached_data_matching(f"{consts.ITEMS_CACHE_NAMESPACE}:*", redis_client)
