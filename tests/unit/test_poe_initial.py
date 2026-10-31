@@ -4,7 +4,6 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-# TODO: see if we can prevent services.py from creating a global DB instance
 with patch.dict(os.environ, {"DB_URL": "mongodb://localhost:27017"}):
     from src.scripts.poe_initial import API_BASE_URL, ApiItemData, get_item_api_data
 

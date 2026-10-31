@@ -32,6 +32,9 @@ from src.utils import jobs
 # TODO: split settings, observability, infrastructure clients, and application lifespan into dedicated modules.
 
 
+_db_client: AsyncIOMotorClient | None = None
+
+
 class AwsService(str, Enum):
     SQS = "sqs"
     S3 = "s3"
@@ -69,6 +72,16 @@ def generate_settings_config(env_location: str | None = None) -> Settings:
         settings = Settings()  # type: ignore
 
     return settings
+
+
+def get_db_client() -> AsyncIOMotorClient:
+    """Return the application database client, creating it on first use."""
+
+    global _db_client
+    if _db_client is None:
+        _db_client = AsyncIOMotorClient(settings.db_url.get_secret_value(), tz_aware=True)
+
+    return _db_client
 
 
 def initialize_aws_session(key_id: str, key_secret: str, region_name: str) -> boto3.Session:
@@ -180,7 +193,7 @@ async def connect_to_mongodb(document_models: list[t.Type[beanie.Document]]) -> 
     logger.info("connecting to database")
 
     try:
-        await beanie.init_beanie(database=db_client.backendBurger, document_models=document_models)  # type: ignore
+        await beanie.init_beanie(database=get_db_client().backendBurger, document_models=document_models)  # type: ignore
     except Exception as exc:
         logger.error(f"error initializing database connection: {exc}")
         raise
@@ -257,5 +270,3 @@ async def setup_services(app_: FastAPI) -> t.AsyncGenerator[None, t.Any]:
 
 
 settings = generate_settings_config()
-# initialize global client object for use across app
-db_client = AsyncIOMotorClient(settings.db_url.get_secret_value(), tz_aware=True)

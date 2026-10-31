@@ -10,7 +10,7 @@ from redis.asyncio import Redis
 from starlette import status
 
 from src.config.constants import app
-from src.config.services import db_client
+from src.config.services import get_db_client
 from src.schemas.users import Role, UserBase
 from src.utils import auth_utils, services as services_utils
 from src.models.users import User
@@ -107,5 +107,5 @@ async def get_db_session():
     """Initializes and yields a DB session through the Motor async client, to enable transaction support, not natively
     available in Beanie."""
 
-    async with await db_client.start_session() as db_session:
+    async with await get_db_client().start_session() as db_session:
         yield db_session
