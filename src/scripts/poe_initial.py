@@ -176,8 +176,9 @@ def write_item_data_to_disk(group: str, category_name: str, data: dict[str, Any]
         json.dump(data, f, indent=4)
 
 
-async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]):
+async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiItemData] | None]) -> bool:
     start = time.perf_counter()
+    all_categories_prepared = True
     async with AsyncClient(base_url=API_BASE_URL) as client:
         for _, categories in CATEGORY_GROUP_MAP.items():
             for category in categories:
@@ -187,10 +188,14 @@ async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiIte
                 category_record = await get_category_by_name(category_name)
                 if category_record is None:
                     logger.error(f"DB record for {category.name} wasn't found, skipping process!")
+                    all_categories_prepared = False
                     continue
 
                 logger.debug(f"getting api data for {category_name}")
                 api_item_data = await get_item_api_data(internal_category_name, client)
+                if api_item_data is None:
+                    all_categories_prepared = False
+                    continue
 
                 api_item_data_payload = (category_record, api_item_data)
                 await api_item_data_queue.put(api_item_data_payload)
@@ -202,6 +207,7 @@ async def prepare_api_data(api_item_data_queue: Queue[tuple[ItemCategory, ApiIte
 
     stop = time.perf_counter()
     logger.info(f"total execution time for preparing api data: {stop - start}")
+    return all_categories_prepared
 
 
 async def get_category_by_name(name: str) -> ItemCategory | None:
@@ -235,7 +241,7 @@ def _parse_item_api_response(json_response: Any) -> ApiItemData:
     return ApiItemData(item_data, currency_item_metadata)
 
 
-async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData:
+async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData | None:
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
 
@@ -249,10 +255,10 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
         api_item_data = _parse_item_api_response(response.json())
     except HTTPError as exc:
         logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
-        return ApiItemData([], [])
+        return None
     except (JSONDecodeError, KeyError, TypeError) as exc:
         logger.error(f"invalid API response for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
-        return ApiItemData([], [])
+        return None
 
     if len(api_item_data.item_data) < 2:
         logger.error(f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'")
@@ -516,12 +522,17 @@ async def main():
     item_data_queue: Queue[list[Item] | None] = Queue()
 
     async with asyncio.TaskGroup() as tg:
-        tg.create_task(prepare_api_data(api_item_data_queue))
+        prepare_task = tg.create_task(prepare_api_data(api_item_data_queue))
         tg.create_task(parse_api_item_data(api_item_data_queue, item_data_queue))
         save_task = tg.create_task(save_item_data(item_data_queue))
 
-    if save_task.result():
+    all_categories_prepared = prepare_task.result()
+    all_batches_saved = save_task.result()
+
+    if all_categories_prepared and all_batches_saved:
         await invalidate_item_responses()
+    elif not all_categories_prepared:
+        logger.warning("skipped item-response cache invalidation because one or more categories could not be prepared")
     else:
         logger.warning("skipped item-response cache invalidation because one or more item batches failed to save")
 

@@ -107,13 +107,11 @@ async def push_items_to_queue(total_items: int, batch_size: int, items_queue: Qu
 
 async def prepare_api_data(
     item: ItemRecord, price_history_map: dict[Any, list[PriceHistoryEntity]], client: AsyncClient
-) -> None:
+) -> bool:
     """Helper function to get and prepare Price History API data, and add it to the provided hashmap."""
 
     item_id = item.poe_ninja_id
     category = item.category
-
-    api_call_succeeded = True
 
     if category in ("Currency", "Fragment"):
         url = f"currencyhistory?league={LEAGUE}&type={category}&currencyId={item_id}"
@@ -128,36 +126,34 @@ async def prepare_api_data(
         logger.error(
             f"error getting price history data for item_id {item_id} belonging to '{category}' category: {exc}"
         )
-        api_call_succeeded = False
+        return False
     except JSONDecodeError:
         logger.error(f"invalid price history API response for item_id {item_id} belonging to '{category}' category")
-        api_call_succeeded = False
-
-    if not api_call_succeeded:
-        price_history_map[item] = []
-        return
+        return False
 
     try:
         if isinstance(price_history_api_data, dict):
-            price_history_api_data = price_history_api_data.pop("receiveCurrencyGraphData", [])
+            price_history_api_data = price_history_api_data["receiveCurrencyGraphData"]
         ta = TypeAdapter(list[PriceHistoryEntity])
         price_history_data = ta.validate_python(price_history_api_data)
-    except pydantic.ValidationError as exc:
+    except (KeyError, pydantic.ValidationError) as exc:
         logger.error(
             f"error parsing price history data for item_id {item_id} belonging to '{category}' category: {exc}"
         )
-        price_history_data = []
+        return False
 
     price_history_map[item] = price_history_data
+    return True
 
 
 async def get_price_history_data(
     items_queue: Queue[list[ItemRecord] | None],
     price_history_queue: Queue[dict[ItemRecord, list[PriceHistoryEntity]] | None],
-) -> None:
+) -> bool:
     """Gets all available price history data for the available items, and parses them into a consistent schema.
     Maps and pushes the data into a queue for futher processing."""
 
+    all_api_calls_succeeded = True
     while True:
         price_history_map = {}
         items = await items_queue.get()
@@ -165,7 +161,7 @@ async def get_price_history_data(
             # signal end of production
             await price_history_queue.put(None)
             logger.debug("processed all API calls, stopping...")
-            return
+            return all_api_calls_succeeded
 
         start = time.perf_counter()
         offset = 0
@@ -184,7 +180,8 @@ async def get_price_history_data(
                         tasks.append(asyncio.create_task(prepare_api_data(item, price_history_map, client)))
 
                     for task in tasks:
-                        await task
+                        if not await task:
+                            all_api_calls_succeeded = False
 
                     offset += limit
 
@@ -381,12 +378,17 @@ async def main():
 
     async with asyncio.TaskGroup() as tg:
         tg.create_task(push_items_to_queue(total_items, BATCH_SIZE, items_queue))
-        tg.create_task(get_price_history_data(items_queue, price_history_queue))
+        price_history_task = tg.create_task(get_price_history_data(items_queue, price_history_queue))
         tg.create_task(manage_prediction_data(price_history_queue, updated_items_queue))
         update_task = tg.create_task(update_items_data(updated_items_queue))
 
-    if update_task.result():
+    all_price_history_fetched = price_history_task.result()
+    all_batches_updated = update_task.result()
+
+    if all_price_history_fetched and all_batches_updated:
         await invalidate_item_responses()
+    elif not all_price_history_fetched:
+        logger.warning("skipped item-response cache invalidation because one or more price-history requests failed")
     else:
         logger.warning("skipped item-response cache invalidation because one or more price-update batches failed")
 
