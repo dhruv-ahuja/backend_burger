@@ -4,13 +4,14 @@ from dataclasses import dataclass
 import datetime as dt
 from decimal import Decimal
 import json
+from json import JSONDecodeError
 import os
 import time
 from typing import Any, cast
 
 import beanie
 import beanie.operators
-from httpx import AsyncClient, RequestError
+from httpx import AsyncClient, HTTPError
 from loguru import logger
 import motor
 from pydantic import BaseModel, Field, computed_field
@@ -215,6 +216,25 @@ async def get_category_by_name(name: str) -> ItemCategory | None:
     return category_record
 
 
+def _parse_item_api_response(json_response: Any) -> ApiItemData:
+    """Validate and extract item data from a poe.ninja API response."""
+
+    if not isinstance(json_response, dict):
+        raise TypeError("API response must be an object")
+
+    item_data = json_response["lines"]
+    currency_item_metadata = json_response.get("currencyDetails", [])
+
+    if not isinstance(item_data, list) or not all(isinstance(item, dict) for item in item_data):
+        raise TypeError("'lines' must be a list of objects")
+    if not isinstance(currency_item_metadata, list) or not all(
+        isinstance(item, dict) for item in currency_item_metadata
+    ):
+        raise TypeError("'currencyDetails' must be a list of objects")
+
+    return ApiItemData(item_data, currency_item_metadata)
+
+
 async def get_item_api_data(internal_category_name: str, client: AsyncClient) -> ApiItemData:
     """Gets data for all Items belonging to a category from the apt Poe Ninja API by preparing and calling the API
     endpoint, then parsing and returning the item data for the category."""
@@ -222,23 +242,21 @@ async def get_item_api_data(internal_category_name: str, client: AsyncClient) ->
     api_endpoint = "currencyoverview" if internal_category_name in ["Currency", "Fragment"] else "itemoverview"
     url = f"/{api_endpoint}?league={LEAGUE}&type={internal_category_name}"
 
-    item_data = []
-    currency_item_metadata = []
-
     try:
         response = await client.get(url)
         logger.debug(f"category: {internal_category_name}, status_code: {response.status_code}")
-    except RequestError as exc:
+        response.raise_for_status()
+        api_item_data = _parse_item_api_response(response.json())
+    except HTTPError as exc:
         logger.error(f"error fetching data for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
-    else:
-        json_response = response.json()
-        item_data: list[dict] = json_response["lines"]
-        if len(item_data) < 2:
-            logger.error(f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'")
+        return ApiItemData([], [])
+    except (JSONDecodeError, KeyError, TypeError) as exc:
+        logger.error(f"invalid API response for '{internal_category_name}' with endpoint '{api_endpoint}': {exc}")
+        return ApiItemData([], [])
 
-        currency_item_metadata: list[dict] = json_response.get("currencyDetails", [])
+    if len(api_item_data.item_data) < 2:
+        logger.error(f"no data found for '{internal_category_name}' with endpoint: '{api_endpoint}'")
 
-    api_item_data = ApiItemData(item_data, currency_item_metadata)
     return api_item_data
 
 
