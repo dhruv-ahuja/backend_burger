@@ -1,11 +1,7 @@
-import os
-from unittest.mock import patch
-
 import httpx
 import pytest
 
-with patch.dict(os.environ, {"DB_URL": "mongodb://localhost:27017"}):
-    from src.scripts.poe_initial import API_BASE_URL, ApiItemData, get_item_api_data
+from src.scripts.poe_initial import API_BASE_URL, ApiItemData, get_item_api_data
 
 
 async def fetch_api_data(response: httpx.Response) -> ApiItemData:
