@@ -287,6 +287,10 @@ async def update_items_data(updated_items_queue: Queue[list[ItemRecord] | None])
             logger.debug("finished updating all item records in database, exiting...")
             return all_batches_updated
 
+        if not updated_items:
+            logger.debug("no updated items to save, skipping database write")
+            continue
+
         for item in updated_items:
             assert item.price_info is not None
             serialized_data = item.price_info.serialize_price_data()

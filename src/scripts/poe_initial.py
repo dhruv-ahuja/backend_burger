@@ -424,6 +424,10 @@ async def save_items(item_records: list[Item]) -> bool:
     """Saves a list of Item records to the database. Uses `pymongo`'s `UpdateOne` method to apply bulk updates to
     items, with the `upsert` flag to update or insert items if they aren't already present."""
 
+    if not item_records:
+        logger.debug("no item records to save, skipping database write")
+        return True
+
     item_collection: motor.motor_asyncio.AsyncIOMotorCollection = Item.get_motor_collection()  # type: ignore
     prepared_item_records = []
 
