@@ -193,7 +193,7 @@ async def connect_to_mongodb(document_models: list[t.Type[beanie.Document]]) -> 
     logger.info("connecting to database")
 
     try:
-        await beanie.init_beanie(database=get_db_client().backendBurger, document_models=document_models)  # type: ignore
+        await beanie.init_beanie(database=get_db_client().get_default_database(), document_models=document_models)  # type: ignore
     except Exception as exc:
         logger.error(f"error initializing database connection: {exc}")
         raise
